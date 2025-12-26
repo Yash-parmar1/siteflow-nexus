@@ -1,96 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Premium Light Mode */
+    --background: 220 20% 97%;
+    --foreground: 220 25% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 25% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 25% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 215 80% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 25% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 175 60% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 215 80% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Status Colors */
+    --status-success: 160 60% 42%;
+    --status-warning: 38 92% 50%;
+    --status-error: 0 72% 55%;
+    --status-info: 215 80% 55%;
+    --status-neutral: 220 10% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Lifecycle Stage Colors */
+    --stage-started: 220 15% 60%;
+    --stage-wts: 280 45% 55%;
+    --stage-wip: 38 85% 55%;
+    --stage-tis: 200 75% 50%;
+    --stage-installed: 160 55% 45%;
+    --stage-live: 145 65% 40%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(215 80% 50%) 0%, hsl(195 75% 45%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(220 20% 98%) 0%, hsl(220 15% 95%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 20% 98%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(215 80% 50% / 0.1) 0%, transparent 70%);
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Shadows */
+    --shadow-sm: 0 1px 2px hsl(220 25% 10% / 0.04);
+    --shadow-md: 0 4px 12px hsl(220 25% 10% / 0.06);
+    --shadow-lg: 0 12px 32px hsl(220 25% 10% / 0.08);
+    --shadow-glow: 0 0 40px hsl(215 80% 50% / 0.15);
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 220 20% 98%;
+    --sidebar-foreground: 220 25% 25%;
+    --sidebar-primary: 215 80% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 94%;
+    --sidebar-accent-foreground: 220 25% 15%;
+    --sidebar-border: 220 15% 90%;
+    --sidebar-ring: 215 80% 50%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Premium Dark Mode - Deep layered tones */
+    --background: 222 25% 8%;
+    --foreground: 220 15% 92%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 22% 11%;
+    --card-foreground: 220 15% 92%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 15% 92%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 210 75% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 222 20% 16%;
+    --secondary-foreground: 220 15% 85%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 222 18% 14%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 175 55% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 222 18% 18%;
+    --input: 222 18% 18%;
+    --ring: 210 75% 55%;
+
+    /* Status Colors - Dark */
+    --status-success: 160 55% 50%;
+    --status-warning: 38 85% 55%;
+    --status-error: 0 65% 55%;
+    --status-info: 210 75% 60%;
+    --status-neutral: 220 10% 50%;
+
+    /* Lifecycle Stage Colors - Dark */
+    --stage-started: 220 15% 50%;
+    --stage-wts: 280 40% 55%;
+    --stage-wip: 38 80% 55%;
+    --stage-tis: 200 70% 55%;
+    --stage-installed: 160 50% 50%;
+    --stage-live: 145 60% 48%;
+
+    /* Gradients - Dark */
+    --gradient-primary: linear-gradient(135deg, hsl(210 75% 55%) 0%, hsl(190 70% 50%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(222 25% 10%) 0%, hsl(222 22% 8%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(222 22% 13%) 0%, hsl(222 22% 10%) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(210 75% 55% / 0.12) 0%, transparent 70%);
+
+    /* Shadows - Dark */
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 12px 32px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 60px hsl(210 75% 55% / 0.2);
+
+    /* Sidebar - Dark */
+    --sidebar-background: 222 22% 9%;
+    --sidebar-foreground: 220 15% 85%;
+    --sidebar-primary: 210 75% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 222 20% 14%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 222 18% 15%;
+    --sidebar-ring: 210 75% 55%;
   }
 }
 
@@ -100,6 +150,116 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Premium scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+    transition: background 0.2s;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-effect {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-success {
+    @apply bg-[hsl(var(--status-success)/0.15)] text-[hsl(var(--status-success))];
+  }
+
+  .status-warning {
+    @apply bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))];
+  }
+
+  .status-error {
+    @apply bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))];
+  }
+
+  .status-info {
+    @apply bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))];
+  }
+
+  .status-neutral {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  .timeline-connector {
+    @apply absolute left-4 top-8 bottom-0 w-0.5 bg-gradient-to-b from-border to-transparent;
+  }
+
+  .data-card {
+    @apply rounded-xl bg-card border border-border/60 p-5 transition-all duration-200;
+  }
+
+  .data-card:hover {
+    @apply border-border shadow-md;
+  }
+
+  .metric-value {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  .metric-label {
+    @apply text-sm text-muted-foreground font-medium;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
   }
 }
