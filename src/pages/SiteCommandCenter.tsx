@@ -1,12 +1,13 @@
 import { useParams } from "react-router-dom";
 import { SiteHeader } from "@/components/sites/SiteHeader";
 import { SiteTimeline } from "@/components/sites/SiteTimeline";
-import { ACSUnitCard } from "@/components/sites/ACSUnitCard";
+import { ACSContractCard } from "@/components/sites/ACSContractCard";
 import { InstallationTracking } from "@/components/sites/InstallationTracking";
 import { MaintenanceTickets } from "@/components/sites/MaintenanceTickets";
 import { FinanceSnapshot } from "@/components/sites/FinanceSnapshot";
+import { Info } from "lucide-react";
 
-// Mock data for site details
+// Mock data for site details with project binding
 const getSiteData = (siteId: string) => ({
   id: siteId,
   name: "Metro Tower - Block A",
@@ -17,6 +18,16 @@ const getSiteData = (siteId: string) => ({
   acsInstalled: 8,
   hasDelay: true,
   delayDays: 5,
+  // Project binding (immutable)
+  projectId: "proj-001",
+  projectName: "Dava India",
+  subprojectId: "subproj-002",
+  subprojectName: "Mumbai",
+  configVersion: "1.0",
+  configuredRent: 15000,
+  configuredTenure: 36,
+  installationIncluded: false,
+  maintenanceIncluded: true,
 });
 
 const mockTimelineEvents = [
@@ -61,6 +72,7 @@ const mockTimelineEvents = [
   },
 ];
 
+// Mock ACS units with individual tenure tracking
 const mockACSUnits = [
   {
     id: "acs-001",
@@ -69,7 +81,15 @@ const mockACSUnits = [
     location: "Floor 1, Zone A",
     status: "operational" as const,
     installDate: "Dec 15, 2023",
+    activationDate: "Dec 20, 2023",
+    tenureMonths: 36,
+    rentStartDate: "Dec 20, 2023",
+    rentEndDate: "Dec 19, 2026",
+    contractStatus: "active" as const,
+    daysRemaining: 1054,
+    monthlyRent: 15000,
     lastMaintenance: "Jan 10, 2024",
+    configurationVersion: "1.0",
   },
   {
     id: "acs-002",
@@ -78,6 +98,14 @@ const mockACSUnits = [
     location: "Floor 1, Zone B",
     status: "operational" as const,
     installDate: "Dec 16, 2023",
+    activationDate: "Dec 22, 2023",
+    tenureMonths: 36,
+    rentStartDate: "Dec 22, 2023",
+    rentEndDate: "Dec 21, 2026",
+    contractStatus: "active" as const,
+    daysRemaining: 1056,
+    monthlyRent: 15000,
+    configurationVersion: "1.0",
   },
   {
     id: "acs-003",
@@ -86,7 +114,15 @@ const mockACSUnits = [
     location: "Floor 2, Zone A",
     status: "maintenance" as const,
     installDate: "Dec 18, 2023",
+    activationDate: "Jan 05, 2024",
+    tenureMonths: 36,
+    rentStartDate: "Jan 05, 2024",
+    rentEndDate: "Jan 04, 2027",
+    contractStatus: "active" as const,
+    daysRemaining: 1100,
+    monthlyRent: 15000,
     hasIssue: true,
+    configurationVersion: "1.0",
   },
   {
     id: "acs-004",
@@ -94,6 +130,17 @@ const mockACSUnits = [
     model: "ProCool 5000X",
     location: "Floor 2, Zone B",
     status: "pending" as const,
+    tenureMonths: 36,
+    configurationVersion: "1.0",
+  },
+  {
+    id: "acs-005",
+    serialNumber: "ACS-MT-005",
+    model: "ProCool 5000X",
+    location: "Floor 3, Zone A",
+    status: "pending" as const,
+    tenureMonths: 36,
+    configurationVersion: "1.0",
   },
 ];
 
@@ -147,17 +194,22 @@ const mockTickets = [
 ];
 
 const mockFinanceData = {
-  rentStartDate: "Jan 15, 2024",
-  monthlyRent: 125000,
-  totalRevenue: 250000,
-  totalCosts: 180000,
-  netProfit: 70000,
-  profitMargin: 28,
+  rentStartDate: "Dec 20, 2023",
+  monthlyRent: 45000, // 3 active ACS x 15000
+  totalRevenue: 90000,
+  totalCosts: 65000,
+  netProfit: 25000,
+  profitMargin: 27.8,
 };
 
 export default function SiteCommandCenter() {
   const { siteId } = useParams();
   const site = getSiteData(siteId || "");
+
+  // Calculate aggregate contract stats
+  const activeContracts = mockACSUnits.filter(u => u.contractStatus === "active").length;
+  const expiringSoon = mockACSUnits.filter(u => (u.contractStatus as string) === "expiring-soon").length;
+  const pendingActivation = mockACSUnits.filter(u => u.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -172,19 +224,48 @@ export default function SiteCommandCenter() {
 
           {/* Right Column - Details */}
           <div className="xl:col-span-2 space-y-6">
-            {/* ACS Units Section */}
+            {/* ACS Units Section with Contract Info */}
             <div className="data-card">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-foreground">
-                  ACS Units
-                </h2>
-                <span className="text-sm text-muted-foreground">
-                  {mockACSUnits.filter((u) => u.status === "operational").length} operational
-                </span>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    ACS Units & Contracts
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Individual tenure tracking per unit
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-status-success" />
+                    <span className="text-muted-foreground">{activeContracts} active</span>
+                  </div>
+                  {expiringSoon > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-status-warning" />
+                      <span className="text-muted-foreground">{expiringSoon} expiring</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-status-info" />
+                    <span className="text-muted-foreground">{pendingActivation} pending</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Info banner about tenure */}
+              <div className="mb-4 p-3 rounded-lg bg-status-info/10 border border-status-info/20">
+                <div className="flex items-start gap-2 text-sm">
+                  <Info className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
+                  <div className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Tenure is per ACS unit.</span> Each unit's contract starts on activation and ends after {site.configuredTenure} months independently.
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {mockACSUnits.map((unit) => (
-                  <ACSUnitCard key={unit.id} unit={unit} />
+                  <ACSContractCard key={unit.id} unit={unit} />
                 ))}
               </div>
             </div>
