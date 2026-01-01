@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SiteCard } from "./SiteCard";
+import { ProjectBoundSiteCard } from "./ProjectBoundSiteCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Filter, Grid3X3, List } from "lucide-react";
+import { Search, Plus, Filter, Grid3X3, List, FolderKanban } from "lucide-react";
 
-// Mock data
+// Mock data with project bindings
 const mockSites = [
   {
     id: "site-001",
@@ -24,6 +24,14 @@ const mockSites = [
     acsInstalled: 8,
     hasDelay: true,
     rentStartDate: "Jan 15, 2024",
+    // Project binding
+    projectId: "proj-001",
+    projectName: "Dava India",
+    subprojectId: "subproj-002",
+    subprojectName: "Mumbai",
+    configVersion: "1.0",
+    configuredRent: 15000,
+    configuredTenure: 36,
   },
   {
     id: "site-002",
@@ -35,6 +43,13 @@ const mockSites = [
     acsInstalled: 21,
     hasDelay: false,
     rentStartDate: "Feb 01, 2024",
+    projectId: "proj-001",
+    projectName: "Dava India",
+    subprojectId: "subproj-002",
+    subprojectName: "Mumbai",
+    configVersion: "1.0",
+    configuredRent: 15000,
+    configuredTenure: 36,
   },
   {
     id: "site-003",
@@ -46,6 +61,13 @@ const mockSites = [
     acsInstalled: 18,
     hasDelay: false,
     rentStartDate: "Dec 10, 2023",
+    projectId: "proj-001",
+    projectName: "Dava India",
+    subprojectId: "subproj-001",
+    subprojectName: "Delhi",
+    configVersion: "1.0",
+    configuredRent: 12500,
+    configuredTenure: 36,
   },
   {
     id: "site-004",
@@ -57,6 +79,13 @@ const mockSites = [
     acsInstalled: 30,
     hasDelay: false,
     rentStartDate: "Mar 01, 2024",
+    projectId: "proj-001",
+    projectName: "Dava India",
+    subprojectId: "subproj-003",
+    subprojectName: "Bangalore",
+    configVersion: "1.0",
+    configuredRent: 14000,
+    configuredTenure: 48,
   },
   {
     id: "site-005",
@@ -67,6 +96,13 @@ const mockSites = [
     acsPlanned: 16,
     acsInstalled: 5,
     hasDelay: true,
+    projectId: "proj-002",
+    projectName: "TechBank National",
+    subprojectId: "subproj-004",
+    subprojectName: "Tier-1 Cities",
+    configVersion: "1.0",
+    configuredRent: 16000,
+    configuredTenure: 36,
   },
   {
     id: "site-006",
@@ -77,21 +113,34 @@ const mockSites = [
     acsPlanned: 20,
     acsInstalled: 0,
     hasDelay: false,
+    projectId: "proj-002",
+    projectName: "TechBank National",
+    subprojectId: "subproj-005",
+    subprojectName: "Tier-2 Cities",
+    configVersion: "1.0",
+    configuredRent: 12000,
+    configuredTenure: 48,
   },
 ];
+
+// Unique projects for filter
+const projectOptions = Array.from(new Set(mockSites.map(s => s.projectName)));
 
 export function SiteList() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const filteredSites = mockSites.filter((site) => {
     const matchesSearch =
       site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      site.location.toLowerCase().includes(searchQuery.toLowerCase());
+      site.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      site.projectName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStage = stageFilter === "all" || site.stage === stageFilter;
-    return matchesSearch && matchesStage;
+    const matchesProject = projectFilter === "all" || site.projectName === projectFilter;
+    return matchesSearch && matchesStage && matchesProject;
   });
 
   const stages = ["all", "Started", "WTS", "WIP", "TIS", "Installed", "Live"];
@@ -103,7 +152,7 @@ export function SiteList() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Sites</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {filteredSites.length} sites across all locations
+            {filteredSites.length} sites across all projects
           </p>
         </div>
         <Button size="default" className="shrink-0">
@@ -118,7 +167,7 @@ export function SiteList() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search sites..."
+            placeholder="Search sites, projects..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -126,6 +175,21 @@ export function SiteList() {
         </div>
 
         <div className="flex gap-2">
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="w-[160px] bg-secondary/50">
+              <FolderKanban className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Project" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Projects</SelectItem>
+              {projectOptions.map((project) => (
+                <SelectItem key={project} value={project}>
+                  {project}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={stageFilter} onValueChange={setStageFilter}>
             <SelectTrigger className="w-[140px] bg-secondary/50">
               <Filter className="w-4 h-4 mr-2" />
@@ -173,7 +237,7 @@ export function SiteList() {
             className="animate-slide-up"
             style={{ animationDelay: `${index * 50}ms` }}
           >
-            <SiteCard site={site} onClick={() => navigate(`/site/${site.id}`)} />
+            <ProjectBoundSiteCard site={site} onClick={() => navigate(`/site/${site.id}`)} />
           </div>
         ))}
       </div>
