@@ -15,12 +15,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  FolderKanban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navigationItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "Sites", href: "/", icon: MapPin },
   { name: "Assets (ACS)", href: "/assets", icon: Box },
   { name: "Installations", href: "/installations", icon: Wrench },

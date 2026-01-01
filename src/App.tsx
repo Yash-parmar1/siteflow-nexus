@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Projects from "./pages/Projects";
 import SiteCommandCenter from "./pages/SiteCommandCenter";
 import Assets from "./pages/Assets";
 import Installations from "./pages/Installations";
@@ -29,6 +30,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/projects" element={<Projects />} />
             <Route path="/site/:siteId" element={<SiteCommandCenter />} />
             <Route path="/assets" element={<Assets />} />
             <Route path="/installations" element={<Installations />} />
