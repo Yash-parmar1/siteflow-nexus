@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,12 @@ import {
   Wrench,
   MoreHorizontal,
   Download,
-  ChevronDown,
   AlertCircle,
   CheckCircle2,
   Clock,
   XCircle,
+  FolderKanban,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,109 +43,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Mock data for ACS units
-const mockACSUnits = [
-  {
-    id: "ACS-001",
-    serialNumber: "SN-2024-0001",
-    model: "ACS Pro X1",
-    site: "Metro Tower - Block A",
-    siteId: "site-001",
-    location: "Floor 12, Zone A",
-    status: "Operational",
-    installDate: "Jan 15, 2024",
-    lastMaintenance: "Dec 01, 2024",
-    nextMaintenance: "Mar 01, 2025",
-    warrantyExpiry: "Jan 15, 2027",
-    openTickets: 0,
-  },
-  {
-    id: "ACS-002",
-    serialNumber: "SN-2024-0002",
-    model: "ACS Pro X2",
-    site: "Metro Tower - Block A",
-    siteId: "site-001",
-    location: "Floor 15, Zone B",
-    status: "Under Maintenance",
-    installDate: "Jan 18, 2024",
-    lastMaintenance: "Nov 15, 2024",
-    nextMaintenance: "Feb 15, 2025",
-    warrantyExpiry: "Jan 18, 2027",
-    openTickets: 1,
-  },
-  {
-    id: "ACS-003",
-    serialNumber: "SN-2024-0003",
-    model: "ACS Lite",
-    site: "Phoenix Mall Expansion",
-    siteId: "site-002",
-    location: "Atrium Level",
-    status: "Operational",
-    installDate: "Feb 05, 2024",
-    lastMaintenance: "Oct 20, 2024",
-    nextMaintenance: "Jan 20, 2025",
-    warrantyExpiry: "Feb 05, 2027",
-    openTickets: 0,
-  },
-  {
-    id: "ACS-004",
-    serialNumber: "SN-2024-0004",
-    model: "ACS Pro X1",
-    site: "Cyber Hub Tower 5",
-    siteId: "site-003",
-    location: "Main Lobby",
-    status: "Operational",
-    installDate: "Dec 10, 2023",
-    lastMaintenance: "Dec 10, 2024",
-    nextMaintenance: "Mar 10, 2025",
-    warrantyExpiry: "Dec 10, 2026",
-    openTickets: 0,
-  },
-  {
-    id: "ACS-005",
-    serialNumber: "SN-2024-0005",
-    model: "ACS Pro X2",
-    site: "Prestige Tech Park",
-    siteId: "site-004",
-    location: "Building C, Floor 3",
-    status: "Faulty",
-    installDate: "Mar 01, 2024",
-    lastMaintenance: "Sep 01, 2024",
-    nextMaintenance: "Overdue",
-    warrantyExpiry: "Mar 01, 2027",
-    openTickets: 2,
-  },
-  {
-    id: "ACS-006",
-    serialNumber: "SN-2024-0006",
-    model: "ACS Ultra",
-    site: "DLF Cyber City Phase 3",
-    siteId: "site-005",
-    location: "Tower A, Floor 8",
-    status: "Pending Install",
-    installDate: "-",
-    lastMaintenance: "-",
-    nextMaintenance: "-",
-    warrantyExpiry: "-",
-    openTickets: 0,
-  },
-  {
-    id: "ACS-007",
-    serialNumber: "SN-2024-0007",
-    model: "ACS Pro X1",
-    site: "Mindspace IT Park",
-    siteId: "site-006",
-    location: "Unassigned",
-    status: "In Transit",
-    installDate: "-",
-    lastMaintenance: "-",
-    nextMaintenance: "-",
-    warrantyExpiry: "-",
-    openTickets: 0,
-  },
-];
+import { Card, CardContent } from "@/components/ui/card";
+import { mockACSUnits, mockProjects, getSubprojectById } from "@/data/mockData";
+import { AddUnitDialog } from "@/components/forms/AddUnitDialog";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   Operational: { color: "status-success", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
@@ -156,29 +57,81 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
 
 export default function Assets() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Read filters from URL
+  const urlProjectId = searchParams.get("projectId") || "";
+  const urlSubprojectId = searchParams.get("subprojectId") || "";
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>(urlProjectId || "all");
+  const [subprojectFilter, setSubprojectFilter] = useState<string>(urlSubprojectId || "all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [addUnitOpen, setAddUnitOpen] = useState(false);
+
+  // Get subproject info if filtered
+  const subprojectInfo = urlSubprojectId ? getSubprojectById(urlSubprojectId) : null;
+  
+  // Project options
+  const projectOptions = mockProjects.map(p => ({ id: p.id, name: p.name }));
+  
+  // Subprojects for selected project
+  const selectedProject = mockProjects.find(p => p.id === projectFilter);
+  const subprojectOptions = selectedProject?.subprojects.map(s => ({ id: s.id, name: s.name })) || [];
 
   const filteredUnits = mockACSUnits.filter((unit) => {
     const matchesSearch =
       unit.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      unit.site.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      unit.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       unit.model.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || unit.status === statusFilter;
     const matchesModel = modelFilter === "all" || unit.model === modelFilter;
-    return matchesSearch && matchesStatus && matchesModel;
+    const matchesProject = projectFilter === "all" || unit.projectId === projectFilter;
+    const matchesSubproject = subprojectFilter === "all" || unit.subprojectId === subprojectFilter;
+    return matchesSearch && matchesStatus && matchesModel && matchesProject && matchesSubproject;
   });
 
   const statuses = ["all", "Operational", "Under Maintenance", "Faulty", "Pending Install", "In Transit"];
   const models = ["all", "ACS Pro X1", "ACS Pro X2", "ACS Lite", "ACS Ultra"];
 
-  // Stats
-  const totalUnits = mockACSUnits.length;
-  const operationalUnits = mockACSUnits.filter((u) => u.status === "Operational").length;
-  const faultyUnits = mockACSUnits.filter((u) => u.status === "Faulty").length;
-  const pendingUnits = mockACSUnits.filter((u) => u.status === "Pending Install" || u.status === "In Transit").length;
+  // Stats (filtered)
+  const totalUnits = filteredUnits.length;
+  const operationalUnits = filteredUnits.filter((u) => u.status === "Operational").length;
+  const faultyUnits = filteredUnits.filter((u) => u.status === "Faulty").length;
+  const pendingUnits = filteredUnits.filter((u) => u.status === "Pending Install" || u.status === "In Transit").length;
+
+  const clearFilters = () => {
+    setProjectFilter("all");
+    setSubprojectFilter("all");
+    setSearchParams({});
+  };
+
+  const handleProjectChange = (value: string) => {
+    setProjectFilter(value);
+    setSubprojectFilter("all");
+    if (value === "all") {
+      searchParams.delete("projectId");
+      searchParams.delete("subprojectId");
+    } else {
+      searchParams.set("projectId", value);
+      searchParams.delete("subprojectId");
+    }
+    setSearchParams(searchParams);
+  };
+
+  const handleSubprojectChange = (value: string) => {
+    setSubprojectFilter(value);
+    if (value === "all") {
+      searchParams.delete("subprojectId");
+    } else {
+      searchParams.set("subprojectId", value);
+    }
+    setSearchParams(searchParams);
+  };
+
+  const hasActiveFilters = projectFilter !== "all" || subprojectFilter !== "all";
 
   return (
     <div className="p-6 animate-fade-in">
@@ -187,7 +140,7 @@ export default function Assets() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Assets (ACS Units)</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage and track all ACS units across sites
+            {totalUnits} units{hasActiveFilters ? " (filtered)" : " across all sites"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -195,12 +148,31 @@ export default function Assets() {
             <Download className="w-4 h-4" />
             Export
           </Button>
-          <Button size="default">
+          <Button size="default" onClick={() => setAddUnitOpen(true)}>
             <Plus className="w-4 h-4" />
             Add Unit
           </Button>
         </div>
       </div>
+
+      {/* Active filter banner */}
+      {subprojectInfo && (
+        <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FolderKanban className="w-4 h-4 text-primary" />
+            <span className="text-sm">
+              Showing units for <strong>{subprojectInfo.project.name}</strong> / <strong>{subprojectInfo.subproject.name}</strong>
+            </span>
+            <Badge variant="outline" className="text-xs">
+              ₹{subprojectInfo.subproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo • {subprojectInfo.subproject.configuration.tenureMonths}mo tenure
+            </Badge>
+          </div>
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="w-4 h-4 mr-1" />
+            Clear Filter
+          </Button>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -272,8 +244,39 @@ export default function Assets() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
+          <Select value={projectFilter} onValueChange={handleProjectChange}>
+            <SelectTrigger className="w-[150px] bg-secondary/50">
+              <FolderKanban className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Project" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Projects</SelectItem>
+              {projectOptions.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {projectFilter !== "all" && subprojectOptions.length > 0 && (
+            <Select value={subprojectFilter} onValueChange={handleSubprojectChange}>
+              <SelectTrigger className="w-[140px] bg-secondary/50">
+                <SelectValue placeholder="Subproject" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="all">All Subprojects</SelectItem>
+                {subprojectOptions.map((sub) => (
+                  <SelectItem key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] bg-secondary/50">
+            <SelectTrigger className="w-[150px] bg-secondary/50">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -286,7 +289,7 @@ export default function Assets() {
           </Select>
 
           <Select value={modelFilter} onValueChange={setModelFilter}>
-            <SelectTrigger className="w-[140px] bg-secondary/50">
+            <SelectTrigger className="w-[130px] bg-secondary/50">
               <SelectValue placeholder="Model" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -325,11 +328,11 @@ export default function Assets() {
               <TableRow className="hover:bg-transparent border-border">
                 <TableHead className="text-muted-foreground font-medium">Serial Number</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Model</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Project / Subproject</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Site</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Location</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Status</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Install Date</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Next Maintenance</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Rent</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Tenure End</TableHead>
                 <TableHead className="text-muted-foreground font-medium w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -338,28 +341,33 @@ export default function Assets() {
                 <TableRow
                   key={unit.id}
                   className="cursor-pointer hover:bg-muted/50 border-border/50"
-                  onClick={() => navigate(`/site/${unit.siteId}`)}
+                  onClick={() => navigate(`/assets/${unit.id}`)}
                 >
                   <TableCell className="font-medium">{unit.serialNumber}</TableCell>
                   <TableCell>{unit.model}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                      {unit.site}
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">{unit.projectName}</span>
+                      <span className="text-sm">{unit.subprojectName}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{unit.location}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                      {unit.siteName}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <span className={`status-badge ${statusConfig[unit.status]?.color}`}>
                       {statusConfig[unit.status]?.icon}
                       {unit.status}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{unit.installDate}</TableCell>
-                  <TableCell>
-                    <span className={unit.nextMaintenance === "Overdue" ? "text-[hsl(var(--status-error))] font-medium" : "text-muted-foreground"}>
-                      {unit.nextMaintenance}
-                    </span>
+                  <TableCell className="font-medium">
+                    ₹{unit.configuredRent.toLocaleString("en-IN")}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {unit.rentEndDate || "-"}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -369,8 +377,9 @@ export default function Assets() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover border-border">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Unit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate(`/assets/${unit.id}`)}>
+                          View Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem>Schedule Maintenance</DropdownMenuItem>
                         <DropdownMenuItem>Create Ticket</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -391,7 +400,7 @@ export default function Assets() {
               key={unit.id}
               className="data-card cursor-pointer animate-slide-up"
               style={{ animationDelay: `${index * 50}ms` }}
-              onClick={() => navigate(`/site/${unit.siteId}`)}
+              onClick={() => navigate(`/assets/${unit.id}`)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
@@ -407,16 +416,16 @@ export default function Assets() {
 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{unit.site}</span>
+                    <FolderKanban className="w-3.5 h-3.5" />
+                    <span>{unit.projectName} / {unit.subprojectName}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Box className="w-3.5 h-3.5" />
-                    <span>{unit.location}</span>
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{unit.siteName}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>Installed: {unit.installDate}</span>
+                    <span>₹{unit.configuredRent.toLocaleString("en-IN")}/mo • {unit.tenureMonths}mo</span>
                   </div>
                 </div>
 
@@ -440,11 +449,18 @@ export default function Assets() {
             <Box className="w-7 h-7 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-1">No units found</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mb-4">
             Try adjusting your search or filter criteria
           </p>
+          {hasActiveFilters && (
+            <Button variant="outline" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          )}
         </div>
       )}
+
+      <AddUnitDialog open={addUnitOpen} onOpenChange={setAddUnitOpen} />
     </div>
   );
 }
