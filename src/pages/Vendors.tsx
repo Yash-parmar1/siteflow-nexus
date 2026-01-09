@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AddVendorDialog } from "@/components/forms/AddVendorDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,7 @@ export default function Vendors() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const filteredVendors = mockVendors.filter((vendor) => {
     const matchesSearch =
@@ -190,7 +192,7 @@ export default function Vendors() {
             Manage installers, suppliers, and service providers
           </p>
         </div>
-        <Button size="default">
+        <Button size="default" onClick={() => setShowAddDialog(true)}>
           <Plus className="w-4 h-4" />
           Add Vendor
         </Button>
@@ -429,6 +431,8 @@ export default function Vendors() {
           </p>
         </div>
       )}
+
+      <AddVendorDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
     </div>
   );
 }

@@ -12,6 +12,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Search,
   Download,
   FileText,
@@ -20,16 +26,15 @@ import {
   TrendingUp,
   Calendar,
   Clock,
-  Filter,
   RefreshCw,
   Eye,
-  Mail,
-  Printer,
   Share2,
-  ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
+  Wand2,
 } from "lucide-react";
+import { CustomReportBuilder } from "@/components/reports/CustomReportBuilder";
+import { SavedReportTemplates } from "@/components/reports/SavedReportTemplates";
 
 // Mock data for reports
 const reportTemplates = [
@@ -141,6 +146,7 @@ const categoryColors: Record<string, string> = {
 export default function Reports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showCustomBuilder, setShowCustomBuilder] = useState(false);
 
   const filteredTemplates = reportTemplates.filter((template) => {
     const matchesSearch =
@@ -167,8 +173,8 @@ export default function Reports() {
             <Calendar className="w-4 h-4" />
             Schedule
           </Button>
-          <Button size="default">
-            <FileText className="w-4 h-4" />
+          <Button size="default" onClick={() => setShowCustomBuilder(true)}>
+            <Wand2 className="w-4 h-4" />
             Custom Report
           </Button>
         </div>
@@ -194,11 +200,12 @@ export default function Reports() {
 
       <Tabs defaultValue="templates" className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <TabsList className="bg-secondary/50">
-            <TabsTrigger value="templates">Report Templates</TabsTrigger>
-            <TabsTrigger value="generated">Generated Reports</TabsTrigger>
-            <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
-          </TabsList>
+        <TabsList className="bg-secondary/50">
+          <TabsTrigger value="templates">Report Templates</TabsTrigger>
+          <TabsTrigger value="saved">My Templates</TabsTrigger>
+          <TabsTrigger value="generated">Generated Reports</TabsTrigger>
+          <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
+        </TabsList>
 
           <div className="flex gap-2">
             <div className="relative max-w-xs">
@@ -279,6 +286,19 @@ export default function Reports() {
               );
             })}
           </div>
+        </TabsContent>
+
+        {/* Saved Templates Tab */}
+        <TabsContent value="saved">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">My Custom Templates</CardTitle>
+              <CardDescription>Your saved custom report configurations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SavedReportTemplates onEdit={() => setShowCustomBuilder(true)} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Generated Reports */}
@@ -364,12 +384,11 @@ export default function Reports() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="w-4 h-4" />
+                        <Calendar className="w-4 h-4" />
                         <span>3 recipients</span>
                       </div>
                       <Button variant="ghost" size="sm">
                         Edit
-                        <ChevronRight className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -379,6 +398,16 @@ export default function Reports() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Custom Report Builder Dialog */}
+      <Dialog open={showCustomBuilder} onOpenChange={setShowCustomBuilder}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Custom Report Builder</DialogTitle>
+          </DialogHeader>
+          <CustomReportBuilder onClose={() => setShowCustomBuilder(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
