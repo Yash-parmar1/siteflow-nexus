@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AddUserDialog } from "@/components/forms/AddUserDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,7 @@ const systemSettings = [
 export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [showAddUserDialog, setShowAddUserDialog] = useState(false);
 
   const filteredUsers = mockUsers.filter((user) => {
     const matchesSearch =
@@ -266,7 +268,7 @@ export default function Admin() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button size="default">
+                  <Button size="default" onClick={() => setShowAddUserDialog(true)}>
                     <UserPlus className="w-4 h-4" />
                     Add User
                   </Button>
@@ -519,6 +521,8 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AddUserDialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog} />
     </div>
   );
 }

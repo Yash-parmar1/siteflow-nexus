@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AddInstallationDialog } from "@/components/forms/AddInstallationDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -158,6 +159,7 @@ export default function Installations() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const filteredInstallations = mockInstallations.filter((inst) => {
     const matchesSearch =
@@ -191,7 +193,7 @@ export default function Installations() {
             <Download className="w-4 h-4" />
             Export
           </Button>
-          <Button size="default">
+          <Button size="default" onClick={() => setShowAddDialog(true)}>
             <Plus className="w-4 h-4" />
             New Installation
           </Button>
@@ -383,6 +385,8 @@ export default function Installations() {
           </p>
         </div>
       )}
+
+      <AddInstallationDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
     </div>
   );
 }
