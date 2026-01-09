@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AddClientDialog } from "@/components/forms/AddClientDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -166,6 +167,7 @@ export default function Clients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const filteredClients = mockClients.filter((client) => {
     const matchesSearch =
@@ -203,7 +205,7 @@ export default function Clients() {
             Manage client relationships and contracts
           </p>
         </div>
-        <Button size="default">
+        <Button size="default" onClick={() => setShowAddDialog(true)}>
           <Plus className="w-4 h-4" />
           Add Client
         </Button>
@@ -412,6 +414,8 @@ export default function Clients() {
           </p>
         </div>
       )}
+
+      <AddClientDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
     </div>
   );
 }
