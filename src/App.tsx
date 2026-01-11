@@ -19,6 +19,8 @@ import Reports from "./pages/Reports";
 import Finance from "./pages/Finance";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 const queryClient = new QueryClient();
 
@@ -28,24 +30,36 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppLayout>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/site/:siteId" element={<SiteCommandCenter />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/assets/:assetId" element={<AssetDetail />} />
-            <Route path="/installations" element={<Installations />} />
-            <Route path="/maintenance" element={<Maintenance />} />
-            <Route path="/vendors" element={<Vendors />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AppLayout>
+        <Routes>
+          {/* Auth routes without AppLayout */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          
+          {/* App routes with AppLayout */}
+          <Route
+            path="/*"
+            element={
+              <AppLayout>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="/site/:siteId" element={<SiteCommandCenter />} />
+                  <Route path="/assets" element={<Assets />} />
+                  <Route path="/assets/:assetId" element={<AssetDetail />} />
+                  <Route path="/installations" element={<Installations />} />
+                  <Route path="/maintenance" element={<Maintenance />} />
+                  <Route path="/vendors" element={<Vendors />} />
+                  <Route path="/clients" element={<Clients />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/finance" element={<Finance />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </AppLayout>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
