@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AddClientDialog } from "@/components/forms/AddClientDialog";
 import { Input } from "@/components/ui/input";
@@ -43,112 +43,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Client } from "@/types/client";
 
-// Mock data for clients
-const mockClients = [
-  {
-    id: "CLT-001",
-    name: "Metro Properties Ltd.",
-    type: "Enterprise",
-    status: "Active",
-    sites: 4,
-    totalUnits: 48,
-    monthlyRevenue: 1250000,
-    contractStart: "Jan 2023",
-    contractEnd: "Dec 2025",
-    contactPerson: "Anil Kapoor",
-    phone: "+91 98765 11111",
-    email: "anil@metroproperties.com",
-    location: "Mumbai, Maharashtra",
-    outstandingAmount: 125000,
-    paymentStatus: "On Time",
-  },
-  {
-    id: "CLT-002",
-    name: "Phoenix Group",
-    type: "Enterprise",
-    status: "Active",
-    sites: 3,
-    totalUnits: 36,
-    monthlyRevenue: 980000,
-    contractStart: "Mar 2023",
-    contractEnd: "Feb 2026",
-    contactPerson: "Sunita Reddy",
-    phone: "+91 98765 22222",
-    email: "sunita@phoenixgroup.in",
-    location: "Pune, Maharashtra",
-    outstandingAmount: 0,
-    paymentStatus: "On Time",
-  },
-  {
-    id: "CLT-003",
-    name: "DLF Commercial",
-    type: "Enterprise",
-    status: "Active",
-    sites: 5,
-    totalUnits: 62,
-    monthlyRevenue: 1580000,
-    contractStart: "Jun 2022",
-    contractEnd: "May 2025",
-    contactPerson: "Rajesh Mehra",
-    phone: "+91 98765 33333",
-    email: "rajesh@dlfcommercial.com",
-    location: "Gurugram, Haryana",
-    outstandingAmount: 316000,
-    paymentStatus: "Overdue",
-  },
-  {
-    id: "CLT-004",
-    name: "Prestige Estates",
-    type: "Mid-Market",
-    status: "Active",
-    sites: 2,
-    totalUnits: 24,
-    monthlyRevenue: 620000,
-    contractStart: "Sep 2023",
-    contractEnd: "Aug 2026",
-    contactPerson: "Kavita Sharma",
-    phone: "+91 98765 44444",
-    email: "kavita@prestige.in",
-    location: "Bangalore, Karnataka",
-    outstandingAmount: 62000,
-    paymentStatus: "Pending",
-  },
-  {
-    id: "CLT-005",
-    name: "Mindspace REIT",
-    type: "Enterprise",
-    status: "Active",
-    sites: 3,
-    totalUnits: 40,
-    monthlyRevenue: 1100000,
-    contractStart: "Nov 2023",
-    contractEnd: "Oct 2026",
-    contactPerson: "Vinod Patil",
-    phone: "+91 98765 55555",
-    email: "vinod@mindspace.co.in",
-    location: "Hyderabad, Telangana",
-    outstandingAmount: 0,
-    paymentStatus: "On Time",
-  },
-  {
-    id: "CLT-006",
-    name: "Tech Park Ventures",
-    type: "SMB",
-    status: "Inactive",
-    sites: 1,
-    totalUnits: 8,
-    monthlyRevenue: 0,
-    contractStart: "Apr 2022",
-    contractEnd: "Mar 2024",
-    contactPerson: "Amit Jain",
-    phone: "+91 98765 66666",
-    email: "amit@techparkventures.com",
-    location: "Chennai, Tamil Nadu",
-    outstandingAmount: 48000,
-    paymentStatus: "Overdue",
-  },
-];
 
 const typeColors: Record<string, string> = {
   Enterprise: "bg-primary/10 text-primary",
@@ -164,12 +60,45 @@ const paymentStatusColors: Record<string, string> = {
 
 export default function Clients() {
   const navigate = useNavigate();
+  const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
 
-  const filteredClients = mockClients.filter((client) => {
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    try {
+      const response = await fetch("/api/clients");
+      if (!response.ok) {
+        throw new Error("Failed to fetch clients");
+      }
+      const data = await response.json();
+      const formattedData = data.map((client: any) => ({
+        ...client,
+        id: `CLT-${client.id.toString().padStart(3, "0")}`,
+        sites: 0, // a default value
+        totalUnits: 0, // a default value
+        monthlyRevenue: 0, // a default value
+        status: client.active ? "Active" : "Inactive", // a default value
+        contractStart: client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'N/A',
+        contractEnd: client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'N/A',
+      }));
+      setClients(formattedData);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleClientAdded = () => {
+    fetchClients();
+  };
+
+
+  const filteredClients = clients.filter((client) => {
     const matchesSearch =
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.contactPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -183,12 +112,13 @@ export default function Clients() {
   const statuses = ["all", "Active", "Inactive"];
 
   // Stats
-  const totalClients = mockClients.filter((c) => c.status === "Active").length;
-  const totalSites = mockClients.reduce((sum, c) => sum + c.sites, 0);
-  const totalRevenue = mockClients.filter((c) => c.status === "Active").reduce((sum, c) => sum + c.monthlyRevenue, 0);
-  const totalOutstanding = mockClients.reduce((sum, c) => sum + c.outstandingAmount, 0);
+  const totalClients = clients.filter((c) => c.status === "Active").length;
+  const totalSites = clients.reduce((sum, c) => sum + c.sites, 0);
+  const totalRevenue = clients.filter((c) => c.status === "Active").reduce((sum, c) => sum + c.monthlyRevenue, 0);
+  const totalOutstanding = clients.reduce((sum, c) => sum + c.outstandingAmount, 0);
 
   const formatCurrency = (amount: number) => {
+    if(!amount) return "₹0";
     if (amount >= 100000) {
       return `₹${(amount / 100000).toFixed(1)}L`;
     }
@@ -415,7 +345,7 @@ export default function Clients() {
         </div>
       )}
 
-      <AddClientDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
+      <AddClientDialog open={showAddDialog} onOpenChange={setShowAddDialog} onSubmit={handleClientAdded} />
     </div>
   );
 }

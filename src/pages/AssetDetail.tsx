@@ -33,6 +33,7 @@ import {
   Lock,
   TrendingUp,
   History,
+  Activity,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -233,235 +234,274 @@ export default function AssetDetail() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-background animate-fade-in">
+    <div className="min-h-screen bg-background">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="p-4 md:p-6">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-6">
           {/* Breadcrumb and Actions */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon-sm" onClick={() => navigate(-1)}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate(-1)}
+                className="hover:bg-muted"
+              >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
-              <nav className="text-sm text-muted-foreground">
-                <Link to="/assets" className="hover:text-foreground transition-colors">Assets</Link>
-                <span className="mx-2">/</span>
-                <span className="text-foreground">{asset.serialNumber}</span>
+              <nav className="text-sm text-muted-foreground flex items-center">
+                <Link to="/assets" className="hover:text-foreground transition-colors font-medium">
+                  Assets
+                </Link>
+                <span className="mx-2 text-muted-foreground/50">/</span>
+                <span className="text-foreground font-medium">{asset.serialNumber}</span>
               </nav>
             </div>
+            
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-1" />
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="w-4 h-4" />
                 Export
               </Button>
-              <Button variant="outline" size="sm">
-                <Printer className="w-4 h-4 mr-1" />
+              <Button variant="outline" size="sm" className="gap-2">
+                <Printer className="w-4 h-4" />
                 Print
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon-sm">
+                  <Button variant="outline" size="icon">
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Schedule Maintenance</DropdownMenuItem>
-                  <DropdownMenuItem>Create Ticket</DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem className="gap-2">
+                    <Wrench className="w-4 h-4" />
+                    Schedule Maintenance
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2">
+                    <FileText className="w-4 h-4" />
+                    Create Ticket
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>Transfer to Another Site</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">Decommission</DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2">
+                    <Building className="w-4 h-4" />
+                    Transfer to Another Site
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Decommission
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
           {/* Asset Identity */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-6">
+            <div className="flex items-start gap-5">
               <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm"
                 style={{ backgroundColor: `hsl(var(--${status.color}) / 0.15)` }}
               >
-                <Box className="w-7 h-7" style={{ color: `hsl(var(--${status.color}))` }} />
+                <Box className="w-8 h-8" style={{ color: `hsl(var(--${status.color}))` }} />
               </div>
               <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-semibold text-foreground">{asset.serialNumber}</h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-semibold text-foreground tracking-tight">
+                    {asset.serialNumber}
+                  </h1>
                   <span
-                    className="status-badge"
+                    className="status-badge px-3 py-1.5 text-sm font-medium"
                     style={{
                       backgroundColor: `hsl(var(--${status.color}) / 0.15)`,
                       color: `hsl(var(--${status.color}))`,
                     }}
                   >
                     <span
-                      className="w-1.5 h-1.5 rounded-full"
+                      className="w-2 h-2 rounded-full mr-2"
                       style={{ backgroundColor: `hsl(var(--${status.color}))` }}
                     />
                     {status.label}
                   </span>
                 </div>
-                <p className="text-muted-foreground">
-                  {asset.model} by {asset.manufacturer}
+                <p className="text-base text-muted-foreground">
+                  {asset.model} · {asset.manufacturer}
                 </p>
               </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="w-4 h-4" />
-                <Link to={`/site/${asset.currentSiteId}`} className="hover:text-foreground transition-colors">
+            {/* Quick Info Pills */}
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border/50">
+                <MapPin className="w-4 h-4 text-primary" />
+                <Link 
+                  to={`/site/${asset.currentSiteId}`} 
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
                   {asset.currentSiteName}
                 </Link>
               </div>
-              <div className="h-4 w-px bg-border hidden md:block" />
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="w-4 h-4" />
-                <span>Installed: {new Date(asset.installationDetails?.installationDate || "").toLocaleDateString()}</span>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border/50">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  Installed {new Date(asset.installationDetails?.installationDate || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Configuration Context Banner */}
-          <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border/50 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Bound to:</span>
+          <div className="p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/50">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground font-medium">Configuration:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Building className="w-4 h-4 text-foreground" />
+                <span className="text-sm font-semibold text-foreground">{asset.projectName}</span>
+              </div>
+              {asset.subprojectName && (
+                <>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span className="text-sm font-medium text-foreground">{asset.subprojectName}</span>
+                </>
+              )}
+              <span className="ml-auto px-3 py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold">
+                Version {asset.configurationVersion || "1.0"}
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">{asset.projectName}</span>
-            </div>
-            {asset.subprojectName && (
-              <>
-                <span className="text-muted-foreground">/</span>
-                <span className="text-sm text-foreground">{asset.subprojectName}</span>
-              </>
-            )}
-            <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
-              Config v{asset.configurationVersion || "1.0"}
-            </span>
           </div>
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4 md:px-6">
-          <TabsList className="bg-transparent p-0 h-auto border-b-0 gap-4">
-            {[
-              { id: "overview", label: "Overview", icon: Box },
-              { id: "installation", label: "Installation", icon: Wrench },
-              { id: "maintenance", label: "Maintenance", icon: Settings },
-              { id: "evidence", label: "Evidence", icon: Camera },
-              { id: "finance", label: "Finance", icon: DollarSign },
-              { id: "timeline", label: "Timeline", icon: History },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-1 pb-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="max-w-[1600px] mx-auto px-6 lg:px-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-transparent p-0 h-auto border-b-0 gap-1 w-full justify-start">
+              {[
+                { id: "overview", label: "Overview", icon: Activity },
+                { id: "installation", label: "Installation", icon: Wrench },
+                { id: "maintenance", label: "Maintenance", icon: Settings },
+                { id: "evidence", label: "Evidence", icon: Camera },
+                { id: "finance", label: "Finance", icon: DollarSign },
+                { id: "timeline", label: "Timeline", icon: History },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+                    activeTab === tab.id
+                      ? "border-primary text-foreground bg-muted/30"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="p-4 md:p-6">
+      <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-8">
         {/* Overview Tab */}
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Key Info */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* Left Column - Main Info (2/3 width) */}
+            <div className="xl:col-span-2 space-y-8">
               {/* Contract Status Card */}
-              <Card className="data-card">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-primary" />
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-primary" />
                     Contract & Tenure
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Monthly Rent</p>
-                      <p className="text-lg font-semibold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Monthly Rent</p>
+                      <p className="text-2xl font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Tenure</p>
-                      <p className="text-lg font-semibold text-foreground">{asset.tenureMonths} months</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tenure</p>
+                      <p className="text-2xl font-bold text-foreground">{asset.tenureMonths} <span className="text-base font-normal text-muted-foreground">months</span></p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Rent Started</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Start Date</p>
                       <p className="text-lg font-semibold text-foreground">
                         {new Date(asset.rentStartDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Rent Ends</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">End Date</p>
                       <p className="text-lg font-semibold text-foreground">
                         {new Date(asset.rentEndDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Tenure Progress</span>
-                      <span className="font-medium text-foreground">{asset.daysRemaining} days remaining</span>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-muted-foreground">Contract Progress</span>
+                      <span className="font-semibold text-foreground">
+                        {asset.daysRemaining} days remaining
+                      </span>
                     </div>
-                    <Progress value={tenureProgress} className="h-2" />
+                    <Progress value={tenureProgress} className="h-2.5" />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Location & Technical Details */}
+              {/* Location & Warranty Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="data-card">
-                  <CardHeader className="pb-3">
+                <Card className="data-card border-border/50 shadow-sm">
+                  <CardHeader className="pb-4">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-primary" />
-                      Location
+                      <MapPin className="w-5 h-5 text-primary" />
+                      Location Details
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Current Site</p>
-                      <Link to={`/site/${asset.currentSiteId}`} className="font-medium text-foreground hover:text-primary transition-colors">
+                  <CardContent className="space-y-4">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Site</p>
+                      <Link 
+                        to={`/site/${asset.currentSiteId}`} 
+                        className="text-base font-semibold text-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+                      >
                         {asset.currentSiteName}
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </Link>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Location Within Site</p>
-                      <p className="font-medium text-foreground">{asset.locationWithinSite}</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Specific Location</p>
+                      <p className="text-base font-semibold text-foreground">{asset.locationWithinSite}</p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="data-card">
-                  <CardHeader className="pb-3">
+                <Card className="data-card border-border/50 shadow-sm">
+                  <CardHeader className="pb-4">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-primary" />
-                      Warranty
+                      <Shield className="w-5 h-5 text-primary" />
+                      Warranty Information
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <Badge variant={asset.warrantyStatus === "active" ? "default" : "secondary"}>
+                      <span className="text-sm font-medium text-muted-foreground">Status</span>
+                      <Badge 
+                        variant={asset.warrantyStatus === "active" ? "default" : "secondary"}
+                        className="font-semibold"
+                      >
                         {asset.warrantyStatus === "active" ? "Active" : "Expired"}
                       </Badge>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Valid Until</p>
-                      <p className="font-medium text-foreground">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Valid Until</p>
+                      <p className="text-base font-semibold text-foreground">
                         {new Date(asset.warrantyEndDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
@@ -470,109 +510,177 @@ export default function AssetDetail() {
               </div>
 
               {/* Recent Activity */}
-              <Card className="data-card">
-                <CardHeader className="pb-3">
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <History className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <History className="w-5 h-5 text-primary" />
                       Recent Activity
                     </CardTitle>
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab("timeline")}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setActiveTab("timeline")}
+                      className="gap-2"
+                    >
                       View All
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <AssetLifecycleTimeline events={asset.lifecycleEvents.slice(0, 5)} compact />
+                <CardContent className="px-6 pb-6">
+                  <div className="max-h-[400px] overflow-y-auto pr-2">
+                    <AssetLifecycleTimeline events={asset.lifecycleEvents.slice(-8).reverse()} compact />
+                  </div>
                 </CardContent>
               </Card>
+
+              {/* Recent Maintenance (moved to right column) */}
             </div>
 
-            {/* Right Column - Summary Cards */}
+            {/* Right Column - Summary Cards (1/3 width) */}
             <div className="space-y-6">
+             
               {/* Financial Summary */}
-              <Card className="data-card">
-                <CardHeader className="pb-3">
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-primary" />
+                    <TrendingUp className="w-5 h-5 text-primary" />
                     Financial Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Revenue Earned</span>
-                    <span className="font-semibold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</span>
+                    <span className="text-lg font-semibold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Maintenance Cost</span>
-                    <span className="font-semibold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</span>
+                    <span className="text-lg font-semibold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</span>
                   </div>
                   <div className="h-px bg-border" />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Net Contribution</span>
-                    <span className="font-bold text-foreground">₹{asset.netContribution?.toLocaleString()}</span>
+                    <span className="text-xl font-bold text-foreground">₹{asset.netContribution?.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Maintenance Summary */}
-              <Card className="data-card">
-                <CardHeader className="pb-3">
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-primary" />
+                    <Settings className="w-5 h-5 text-primary" />
                     Maintenance Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Services</span>
-                    <span className="font-semibold">{asset.maintenanceHistory.length}</span>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium text-muted-foreground">Total Services</span>
+                    <span className="text-lg font-bold text-foreground">{asset.maintenanceHistory.length}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Parts Replaced</span>
-                    <span className="font-semibold">
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium text-muted-foreground">Parts Replaced</span>
+                    <span className="text-lg font-bold text-foreground">
                       {asset.maintenanceHistory.reduce((sum, m) => sum + m.partsReplaced.length, 0)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Last Service</span>
-                    <span className="font-semibold">
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium text-muted-foreground">Last Service</span>
+                    <span className="text-sm font-semibold text-foreground">
                       {asset.maintenanceHistory.length > 0
-                        ? new Date(asset.maintenanceHistory[asset.maintenanceHistory.length - 1].completedAt || "").toLocaleDateString()
+                        ? new Date(asset.maintenanceHistory[asset.maintenanceHistory.length - 1].completedAt || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
                         : "N/A"}
                     </span>
                   </div>
+                  <Button 
+                    size="sm" 
+                    className="w-full mt-4 gap-2" 
+                    onClick={() => setActiveTab("maintenance")}
+                  >
+                    <Wrench className="w-4 h-4" />
+                    Schedule Maintenance
+                  </Button>
                 </CardContent>
               </Card>
 
               {/* Evidence Summary */}
-              <Card className="data-card">
-                <CardHeader className="pb-3">
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Camera className="w-4 h-4 text-primary" />
+                      <Camera className="w-5 h-5 text-primary" />
                       Evidence
                     </CardTitle>
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab("evidence")}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setActiveTab("evidence")}
+                      className="gap-2"
+                    >
                       View All
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="p-3 rounded-lg bg-secondary/30">
-                      <p className="text-lg font-semibold">{asset.installationDetails?.photos.length || 0}</p>
-                      <p className="text-xs text-muted-foreground">Photos</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.photos.length || 0}</p>
+                      <p className="text-xs font-medium text-muted-foreground mt-1">Photos</p>
                     </div>
-                    <div className="p-3 rounded-lg bg-secondary/30">
-                      <p className="text-lg font-semibold">{asset.installationDetails?.videos.length || 0}</p>
-                      <p className="text-xs text-muted-foreground">Videos</p>
+                    <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.videos.length || 0}</p>
+                      <p className="text-xs font-medium text-muted-foreground mt-1">Videos</p>
                     </div>
-                    <div className="p-3 rounded-lg bg-secondary/30">
-                      <p className="text-lg font-semibold">{asset.installationDetails?.documents.length || 0}</p>
-                      <p className="text-xs text-muted-foreground">Documents</p>
+                    <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.documents.length || 0}</p>
+                      <p className="text-xs font-medium text-muted-foreground mt-1">Documents</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+               {/* Recent Maintenance (moved from left) */}
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Wrench className="w-5 h-5 text-primary" />
+                      Recent Maintenance
+                    </CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setActiveTab("maintenance")}
+                      className="gap-2"
+                    >
+                      View All
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {asset.maintenanceHistory.slice(-3).reverse().map((record) => (
+                    <div key={record.id} className="p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="font-medium text-sm text-foreground line-clamp-2">{record.description}</p>
+                        <Badge 
+                          variant={record.type === "scheduled" ? "secondary" : "outline"}
+                          className="shrink-0 text-xs"
+                        >
+                          {record.type}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{record.performedBy}</span>
+                        <span>{new Date(record.completedAt || record.startedAt || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {asset.maintenanceHistory.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No maintenance records yet</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -581,40 +689,42 @@ export default function AssetDetail() {
 
         {/* Installation Tab */}
         {activeTab === "installation" && asset.installationDetails && (
-          <div className="space-y-6">
+          <div className="max-w-5xl space-y-8">
             {/* Installation Summary */}
-            <Card className="data-card">
+            <Card className="data-card border-border/50 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-status-success" />
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-6 h-6 text-status-success" />
                   Installation Complete
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Date</p>
-                    <p className="font-semibold">{asset.installationDetails.installationDate}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.installationDate}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Team</p>
-                    <p className="font-semibold">{asset.installationDetails.teamName}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Team</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.teamName}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Completed By</p>
-                    <p className="font-semibold">{asset.installationDetails.completedBy}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed By</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.completedBy}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Duration</p>
-                    <p className="font-semibold">{Math.floor((asset.installationDetails.durationMinutes || 0) / 60)}h {(asset.installationDetails.durationMinutes || 0) % 60}m</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duration</p>
+                    <p className="text-base font-semibold text-foreground">
+                      {Math.floor((asset.installationDetails.durationMinutes || 0) / 60)}h {(asset.installationDetails.durationMinutes || 0) % 60}m
+                    </p>
                   </div>
                 </div>
 
                 {asset.installationDetails.qualityCheckPassed && (
-                  <div className="mt-4 p-3 rounded-lg bg-status-success/10 border border-status-success/20 flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-status-success" />
+                  <div className="p-4 rounded-xl bg-status-success/10 border border-status-success/20 flex items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-status-success shrink-0" />
                     <div>
-                      <p className="font-medium text-foreground">Quality Check Passed</p>
+                      <p className="font-semibold text-foreground">Quality Check Passed</p>
                       <p className="text-sm text-muted-foreground">
                         Verified by {asset.installationDetails.qualityCheckedBy} on {asset.installationDetails.qualityCheckDate}
                       </p>
@@ -625,9 +735,9 @@ export default function AssetDetail() {
             </Card>
 
             {/* Materials Used */}
-            <Card className="data-card">
+            <Card className="data-card border-border/50 shadow-sm">
               <CardHeader>
-                <CardTitle>Materials Used</CardTitle>
+                <CardTitle className="text-lg">Materials Used</CardTitle>
               </CardHeader>
               <CardContent>
                 <InstallationMaterialsForm
@@ -639,9 +749,9 @@ export default function AssetDetail() {
             </Card>
 
             {/* Installation Metadata */}
-            <Card className="data-card">
+            <Card className="data-card border-border/50 shadow-sm">
               <CardHeader>
-                <CardTitle>Installation Parameters</CardTitle>
+                <CardTitle className="text-lg">Installation Parameters</CardTitle>
               </CardHeader>
               <CardContent>
                 <DynamicMetadataForm
@@ -655,12 +765,12 @@ export default function AssetDetail() {
 
             {/* Installation Notes */}
             {asset.installationDetails.generalNotes && (
-              <Card className="data-card">
+              <Card className="data-card border-border/50 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Installation Notes</CardTitle>
+                  <CardTitle className="text-lg">Installation Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">{asset.installationDetails.generalNotes}</p>
+                  <p className="text-muted-foreground leading-relaxed">{asset.installationDetails.generalNotes}</p>
                 </CardContent>
               </Card>
             )}
@@ -669,69 +779,92 @@ export default function AssetDetail() {
 
         {/* Maintenance Tab */}
         {activeTab === "maintenance" && (
-          <div className="space-y-6">
+          <div className="max-w-5xl space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Maintenance History</h2>
-              <Button>
-                <Wrench className="w-4 h-4 mr-2" />
+              <div>
+                <h2 className="text-2xl font-semibold text-foreground">Maintenance History</h2>
+                <p className="text-muted-foreground mt-1">Complete service record for this asset</p>
+              </div>
+              <Button className="gap-2">
+                <Wrench className="w-4 h-4" />
                 Schedule Maintenance
               </Button>
             </div>
 
             {asset.maintenanceHistory.map((record) => (
-              <Card key={record.id} className="data-card">
+              <Card key={record.id} className="data-card border-border/50 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{record.description}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {record.performedBy} • {new Date(record.completedAt || record.startedAt || "").toLocaleDateString()}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{record.description}</CardTitle>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <span className="font-medium">{record.performedBy}</span>
+                        <span className="text-muted-foreground/50">·</span>
+                        <span>{new Date(record.completedAt || record.startedAt || "").toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                       </p>
                     </div>
-                    <Badge variant={record.type === "scheduled" ? "secondary" : "outline"}>
-                      {record.type}
+                    <Badge 
+                      variant={record.type === "scheduled" ? "secondary" : "outline"}
+                      className="shrink-0"
+                    >
+                      {record.type === "scheduled" ? "Scheduled" : "Unscheduled"}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   {record.partsReplaced.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Parts Replaced</h4>
-                      <div className="space-y-2">
+                      <h4 className="text-sm font-semibold mb-3 text-foreground">Parts Replaced</h4>
+                      <div className="space-y-3">
                         {record.partsReplaced.map((part) => (
-                          <div key={part.id} className="flex items-center justify-between p-2 rounded bg-secondary/30">
-                            <div>
+                          <div 
+                            key={part.id} 
+                            className="flex items-start justify-between p-4 rounded-lg bg-muted/30 border border-border/50"
+                          >
+                            <div className="space-y-1">
                               <p className="font-medium text-foreground">{part.partName}</p>
-                              <p className="text-xs text-muted-foreground">{part.reason}</p>
+                              <p className="text-sm text-muted-foreground">{part.reason}</p>
                             </div>
-                            <span className="font-medium">₹{part.cost?.toLocaleString()}</span>
+                            <span className="font-semibold text-foreground shrink-0 ml-4">
+                              ₹{part.cost?.toLocaleString()}
+                            </span>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-3 border-t border-border">
-                    <span className="text-sm text-muted-foreground">Total Cost</span>
-                    <span className="font-semibold">₹{record.totalCost?.toLocaleString()}</span>
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <span className="text-sm font-medium text-muted-foreground">Total Cost</span>
+                    <span className="text-xl font-bold text-foreground">₹{record.totalCost?.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
             ))}
 
             {asset.maintenanceHistory.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <Wrench className="w-12 h-12 text-muted-foreground/50 mb-4" />
-                <h3 className="font-medium text-foreground">No maintenance records</h3>
-                <p className="text-sm text-muted-foreground">This asset has no maintenance history yet.</p>
-              </div>
+              <Card className="data-card border-border/50">
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Wrench className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No maintenance records</h3>
+                  <p className="text-sm text-muted-foreground mb-6">This asset has no maintenance history yet</p>
+                  <Button className="gap-2">
+                    <Wrench className="w-4 h-4" />
+                    Schedule First Maintenance
+                  </Button>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
 
         {/* Evidence Tab */}
         {activeTab === "evidence" && asset.installationDetails && (
-          <div className="space-y-6">
+          <div className="max-w-6xl">
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-foreground">Evidence & Documentation</h2>
+              <p className="text-muted-foreground mt-1">Photos, videos, and documents related to this asset</p>
+            </div>
             <EvidenceGallery
               photos={asset.installationDetails.photos}
               videos={asset.installationDetails.videos}
@@ -744,67 +877,72 @@ export default function AssetDetail() {
 
         {/* Finance Tab */}
         {activeTab === "finance" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="data-card">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">Monthly Rent</p>
-                  <p className="text-2xl font-semibold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">per month</p>
+          <div className="max-w-5xl space-y-8">
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground">Financial Overview</h2>
+              <p className="text-muted-foreground mt-1">Revenue, costs, and profitability metrics</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardContent className="p-6 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Monthly Rent</p>
+                  <p className="text-3xl font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">per month</p>
                 </CardContent>
               </Card>
-              <Card className="data-card">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">Total Revenue</p>
-                  <p className="text-2xl font-semibold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">since activation</p>
+              <Card className="data-card border-status-success/20 shadow-sm bg-status-success/5">
+                <CardContent className="p-6 space-y-2">
+                  <p className="text-xs font-medium text-status-success uppercase tracking-wide">Total Revenue</p>
+                  <p className="text-3xl font-bold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">since activation</p>
                 </CardContent>
               </Card>
-              <Card className="data-card">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">Maintenance Cost</p>
-                  <p className="text-2xl font-semibold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">total spent</p>
+              <Card className="data-card border-status-error/20 shadow-sm bg-status-error/5">
+                <CardContent className="p-6 space-y-2">
+                  <p className="text-xs font-medium text-status-error uppercase tracking-wide">Maintenance Cost</p>
+                  <p className="text-3xl font-bold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">total spent</p>
                 </CardContent>
               </Card>
-              <Card className="data-card">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground">Net Contribution</p>
-                  <p className="text-2xl font-semibold text-foreground">₹{asset.netContribution?.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">revenue - costs</p>
+              <Card className="data-card border-primary/20 shadow-sm bg-primary/5">
+                <CardContent className="p-6 space-y-2">
+                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Net Contribution</p>
+                  <p className="text-3xl font-bold text-foreground">₹{asset.netContribution?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">revenue - costs</p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Config Context */}
-            <Card className="data-card">
+            <Card className="data-card border-border/50 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="w-4 h-4" />
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-muted-foreground" />
                   Pricing Configuration (Locked)
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
+              <CardContent className="space-y-6">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Financial rules inherited from configuration v{asset.configurationVersion} at time of activation.
-                  These values cannot be changed retroactively.
+                  These values are locked and cannot be changed retroactively.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Base Rent</p>
-                    <p className="font-semibold">₹{asset.monthlyRent?.toLocaleString()}/mo</p>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Base Rent</p>
+                    <p className="text-lg font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
                   </div>
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Tenure</p>
-                    <p className="font-semibold">{asset.tenureMonths} months</p>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tenure</p>
+                    <p className="text-lg font-bold text-foreground">{asset.tenureMonths} <span className="text-sm font-normal text-muted-foreground">months</span></p>
                   </div>
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Project</p>
-                    <p className="font-semibold">{asset.projectName}</p>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</p>
+                    <p className="text-sm font-semibold text-foreground">{asset.projectName}</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-secondary/30">
-                    <p className="text-xs text-muted-foreground">Subproject</p>
-                    <p className="font-semibold">{asset.subprojectName || "—"}</p>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subproject</p>
+                    <p className="text-sm font-semibold text-foreground">{asset.subprojectName || "—"}</p>
                   </div>
                 </div>
               </CardContent>
@@ -814,10 +952,10 @@ export default function AssetDetail() {
 
         {/* Timeline Tab */}
         {activeTab === "timeline" && (
-          <div className="max-w-3xl">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold">Complete Lifecycle</h2>
-              <p className="text-sm text-muted-foreground">
+          <div className="max-w-4xl">
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-foreground">Complete Lifecycle</h2>
+              <p className="text-muted-foreground mt-1">
                 Full audit trail of all events for this asset
               </p>
             </div>

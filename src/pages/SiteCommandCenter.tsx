@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { SiteHeader } from "@/components/sites/SiteHeader";
 import { SiteTimeline } from "@/components/sites/SiteTimeline";
 import { ACSContractCard } from "@/components/sites/ACSContractCard";
@@ -211,6 +211,8 @@ export default function SiteCommandCenter() {
   const expiringSoon = mockACSUnits.filter(u => (u.contractStatus as string) === "expiring-soon").length;
   const pendingActivation = mockACSUnits.filter(u => u.status === "pending").length;
 
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader site={site} />
@@ -265,7 +267,7 @@ export default function SiteCommandCenter() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {mockACSUnits.map((unit) => (
-                  <ACSContractCard key={unit.id} unit={unit} />
+                  <ACSContractCard key={unit.id} unit={unit} onClick={() => navigate(`/assets/${unit.id}`)} />
                 ))}
               </div>
             </div>
