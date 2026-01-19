@@ -53,8 +53,8 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-sidebar-foreground">ACS Manager</span>
-              <span className="text-[10px] text-muted-foreground font-medium">Operations Hub</span>
+              <span className="text-sm font-semibold text-sidebar-foreground">Nexgen</span>
+              <span className="text-[10px] text-muted-foreground font-medium">AC operation Hub</span>
             </div>
           )}
         </div>

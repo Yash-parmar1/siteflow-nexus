@@ -4,24 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Eye, EyeOff, Building2, Loader2, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
+import api from "@/lib/api";
 export default function Signup() {
   const [formData, setFormData] = useState({
+    username: "",
     firstName: "",
     lastName: "",
     email: "",
-    company: "",
-    role: "",
     password: "",
     confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -61,25 +58,20 @@ export default function Signup() {
       return;
     }
 
-    if (!acceptTerms) {
-      toast({
-        title: "Terms not accepted",
-        description: "Please accept the terms and conditions to continue.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
-    // TODO: Replace with your backend registration logic
     try {
-      // Simulate API call - replace with your actual auth endpoint
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await api.post("/auth/register", {
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+      });
 
       toast({
-        title: "Account created successfully",
-        description: "Please check your email to verify your account.",
+        title: "Account created",
+        description: "Your account is pending admin approval. You'll be notified when it's approved.",
       });
       navigate("/login");
     } catch (error) {
@@ -114,6 +106,19 @@ export default function Signup() {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {/* Username */}
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  placeholder="your.username"
+                  value={formData.username}
+                  onChange={(e) => handleChange("username", e.target.value)}
+                  required
+                  className="h-11"
+                />
+              </div>
+
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -155,35 +160,7 @@ export default function Signup() {
                 />
               </div>
 
-              {/* Company & Role */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="company">Company</Label>
-                  <Input
-                    id="company"
-                    placeholder="Company Name"
-                    value={formData.company}
-                    onChange={(e) => handleChange("company", e.target.value)}
-                    required
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={formData.role} onValueChange={(value) => handleChange("role", value)}>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="project_manager">Project Manager</SelectItem>
-                      <SelectItem value="site_engineer">Site Engineer</SelectItem>
-                      <SelectItem value="technician">Technician</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+
 
               {/* Password */}
               <div className="space-y-2">
@@ -265,31 +242,13 @@ export default function Signup() {
                 </div>
               </div>
 
-              {/* Terms Checkbox */}
-              <div className="flex items-start space-x-2">
-                <Checkbox
-                  id="terms"
-                  checked={acceptTerms}
-                  onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
-                  className="mt-0.5"
-                />
-                <Label htmlFor="terms" className="text-sm font-normal leading-relaxed cursor-pointer">
-                  I agree to the{" "}
-                  <Link to="/terms" className="text-primary hover:underline">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link to="/privacy" className="text-primary hover:underline">
-                    Privacy Policy
-                  </Link>
-                </Label>
-              </div>
+
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
               <Button
                 type="submit"
                 className="w-full h-11"
-                disabled={isLoading || !allRequirementsMet || !passwordsMatch || !acceptTerms}
+                disabled={isLoading || !allRequirementsMet || !passwordsMatch}
               >
                 {isLoading ? (
                   <>

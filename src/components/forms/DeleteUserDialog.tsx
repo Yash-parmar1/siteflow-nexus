@@ -68,12 +68,12 @@ export function DeleteUserDialog({ open, onOpenChange, user, onConfirm }: Delete
           <AlertDialogDescription className="space-y-3">
             <p>
               This action cannot be undone. This will permanently delete{" "}
-              <span className="font-semibold text-foreground">{user?.name}</span>'s account
+              <span className="font-semibold text-foreground">{user?.name || (user as any)?.displayName}</span>'s account
               and remove all associated data.
             </p>
             <div className="p-3 bg-[hsl(var(--status-error)/0.1)] rounded-lg border border-[hsl(var(--status-error)/0.2)]">
               <p className="text-sm text-[hsl(var(--status-error))]">
-                To confirm, type <span className="font-semibold">"{user?.name}"</span> below:
+                To confirm, type <span className="font-semibold">"{user?.name || (user as any)?.displayName}"</span> below:
               </p>
             </div>
             <Input

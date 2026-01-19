@@ -28,26 +28,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Building2 } from "lucide-react";
+import { User, Mail } from "lucide-react";
+import api from "@/lib/api";
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   role: z.string().min(1, "Please select a role"),
-  department: z.string().min(1, "Please select a department"),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
 
-const roles = ["Admin", "Operations Manager", "Finance Manager", "Field Technician", "Viewer"];
-const departments = ["Operations", "Finance", "Maintenance", "Management", "IT"];
+type RoleType = { id: number; name: string; description?: string };
+const rolesPlaceholder: RoleType[] = [];
 
 interface UserData {
   id: string;
   name: string;
   email: string;
   role: string;
-  department: string;
   status: string;
 }
 
@@ -61,6 +60,18 @@ interface EditUserDialogProps {
 export function EditUserDialog({ open, onOpenChange, user, onSubmit }: EditUserDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [roles, setRoles] = useState<RoleType[]>(rolesPlaceholder);
+
+  useEffect(() => { fetchRoles(); }, []);
+
+  async function fetchRoles() {
+    try {
+      const resp = await api.get('/admin/roles');
+      setRoles(resp.data || []);
+    } catch (err) {
+      console.error('Failed to load roles', err);
+    }
+  }
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -68,7 +79,6 @@ export function EditUserDialog({ open, onOpenChange, user, onSubmit }: EditUserD
       name: "",
       email: "",
       role: "",
-      department: "",
     },
   });
 
@@ -78,7 +88,6 @@ export function EditUserDialog({ open, onOpenChange, user, onSubmit }: EditUserD
         name: user.name,
         email: user.email,
         role: user.role,
-        department: user.department,
       });
     }
   }, [user, form]);
@@ -154,7 +163,7 @@ export function EditUserDialog({ open, onOpenChange, user, onSubmit }: EditUserD
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="role"
@@ -169,33 +178,8 @@ export function EditUserDialog({ open, onOpenChange, user, onSubmit }: EditUserD
                       </FormControl>
                       <SelectContent className="bg-popover border-border">
                         {roles.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="department"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Department</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-secondary/50">
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-popover border-border">
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
+                          <SelectItem key={role.id} value={role.name}>
+                            {role.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -341,7 +341,7 @@ export default function Assets() {
                 <TableRow
                   key={unit.id}
                   className="cursor-pointer hover:bg-muted/50 border-border/50"
-                  onClick={() => navigate(`/assets/${unit.id}`)}
+                  onClick={() => navigate(`/site/${unit.siteId}`)}
                 >
                   <TableCell className="font-medium">{unit.serialNumber}</TableCell>
                   <TableCell>{unit.model}</TableCell>
@@ -400,7 +400,7 @@ export default function Assets() {
               key={unit.id}
               className="data-card cursor-pointer animate-slide-up"
               style={{ animationDelay: `${index * 50}ms` }}
-              onClick={() => navigate(`/assets/${unit.id}`)}
+              onClick={() => navigate(`/site/${unit.siteId}`)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
