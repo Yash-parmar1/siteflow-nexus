@@ -1,7 +1,8 @@
 export interface Client {
   id: string;
   name: string;
-  type: string;
+  projects: number;
+
   status: string;
   sites: number;
   totalUnits: number;
@@ -11,7 +12,7 @@ export interface Client {
   contactPerson: string;
   phone: string;
   email: string;
-  location: string;
+  address: string;
   outstandingAmount: number;
   paymentStatus: string;
   gstNumber: string;

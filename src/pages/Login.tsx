@@ -6,33 +6,37 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, EyeOff, Building2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // TODO: Replace with your backend authentication logic
     try {
-      // Simulate API call - replace with your actual auth endpoint
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await api.post("/auth/login", { username, password });
+      const { jwt } = response.data;
+      login(jwt);
       
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
+      const serverMsg = error?.response?.data;
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: serverMsg || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -62,15 +66,15 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  placeholder="your.username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoComplete="username"
                   className="h-11"
                 />
               </div>
@@ -135,16 +139,7 @@ export default function Login() {
           </form>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          By signing in, you agree to our{" "}
-          <Link to="/terms" className="underline hover:text-foreground">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link to="/privacy" className="underline hover:text-foreground">
-            Privacy Policy
-          </Link>
-        </p>
+
       </div>
     </div>
   );

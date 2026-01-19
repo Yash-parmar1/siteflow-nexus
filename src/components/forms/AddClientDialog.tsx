@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { X, Upload, FileText, Image, File } from "lucide-react";
+import api from "@/lib/api";
 
 const clientSchema = z.object({
   name: z.string().min(2, "Client name must be at least 2 characters").max(100),
@@ -126,17 +127,9 @@ export function AddClientDialog({ open, onOpenChange, onSubmit }: AddClientDialo
     setIsSubmitting(true);
     try {
       // 1. Create client
-      const clientResponse = await fetch("/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const clientResponse = await api.post("/clients", data);
 
-      if (!clientResponse.ok) {
-        throw new Error("Failed to create client");
-      }
-
-      const newClient = await clientResponse.json();
+      const newClient = clientResponse.data;
 
       // 2. Upload attachments if any
       if (attachments.length > 0) {
@@ -147,12 +140,9 @@ export function AddClientDialog({ open, onOpenChange, onSubmit }: AddClientDialo
         formData.append("entityType", "CLIENT");
         formData.append("entityId", newClient.id.toString());
 
-        const attachmentResponse = await fetch("/api/documents/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!attachmentResponse.ok) {
+        try {
+          await api.post("/documents/upload", formData);
+        } catch (uploadError) {
           toast.error("Client created, but failed to upload attachments.");
         }
       }

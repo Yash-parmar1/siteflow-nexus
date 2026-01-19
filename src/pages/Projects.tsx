@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Search, Plus, Filter, Building2, FolderKanban, 
   ChevronRight, Lock, IndianRupee, Calendar, Box,
-  MoreHorizontal, Eye, Archive, FileText, MapPin
-} from "lucide-react";
+  MoreHorizontal, Eye, Archive, FileText, MapPin, Trash2
+} from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,10 +22,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { mockProjects, getProjectStats, getSubprojectStats } from "@/data/mockData";
+// Projects are fetched from the backend API instead of mock data
 import { AddProjectDialog } from "@/components/forms/AddProjectDialog";
 import { AddSubprojectDialog } from "@/components/forms/AddSubprojectDialog";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 const statusColors = {
   active: "bg-status-success/15 text-status-success",
@@ -51,12 +54,73 @@ export default function Projects() {
   const [addSubprojectOpen, setAddSubprojectOpen] = useState(false);
   const [selectedProjectForSubproject, setSelectedProjectForSubproject] = useState<{ id: string; name: string } | null>(null);
 
-  const filteredProjects = mockProjects.filter((project) => {
+  const [projects, setProjects] = useState<any[]>([]);
+
+  // Confirmation dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmPayload, setConfirmPayload] = useState<{ kind: 'project'|'subproject'; id: string; name: string; action: 'activate'|'deactivate'|'delete' } | null>(null);
+
+  // Clients for filter
+  const [clients, setClients] = useState<any[]>([]);
+  const [clientFilter, setClientFilter] = useState<string>('all');
+  // Pending attachments for next create
+  const [pendingProjectFiles, setPendingProjectFiles] = useState<File[]>([]);
+  const [pendingSubprojectFiles, setPendingSubprojectFiles] = useState<File[]>([]);
+
+  // Documents modal
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [docsList, setDocsList] = useState<string[]>([]);
+  const [docsEntity, setDocsEntity] = useState<{ kind: 'project'|'subproject'; id: string; name: string } | null>(null);
+  const fetchProjects = async () => {
+    try {
+      const res = await api.get('/projects');
+      console.debug('GET /projects response', res);
+      setProjects(res.data || []);
+    } catch (err) {
+      toast.error('Failed to load projects');
+      console.error('Failed to load projects', err);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/clients');
+      setClients(res.data || []);
+    } catch (err) {
+      console.error('Failed to load clients', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+    fetchClients();
+  }, []);
+
+  useEffect(() => {
+    if (!docsOpen || !docsEntity) return;
+    const fetchDocs = async () => {
+      try {
+        if (docsEntity.kind === 'project') {
+          const res = await api.get(`/projects/${docsEntity.id}/documents`);
+          setDocsList(res.data || []);
+        } else {
+          const res = await api.get(`/projects/subprojects/${docsEntity.id}/documents`);
+          setDocsList(res.data || []);
+        }
+      } catch (err) {
+        setDocsList([]);
+      }
+    };
+    fetchDocs();
+  }, [docsOpen, docsEntity]);
+
+  const filteredProjects = projects.filter((project) => {
     const matchesSearch =
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.clientName.toLowerCase().includes(searchQuery.toLowerCase());
+      project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.clientName || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesClient = clientFilter === 'all' || String(project.clientId) === clientFilter;
+    return matchesSearch && matchesStatus && matchesClient;
   });
 
   const toggleProject = (projectId: string) => {
@@ -67,6 +131,17 @@ export default function Projects() {
       newExpanded.add(projectId);
     }
     setExpandedProjects(newExpanded);
+  };
+
+  // Format createdAt
+  const formatDate = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString();
+    } catch (e) {
+      return iso;
+    }
   };
 
   const handleAddSubproject = (projectId: string, projectName: string) => {
@@ -83,17 +158,59 @@ export default function Projects() {
     navigate(`/assets?projectId=${projectId}&subprojectId=${subprojectId}`);
   };
 
+  // Project actions (activate/deactivate/delete)
+  const handleProjectAction = async (projectId: string, action: 'activate'|'deactivate'|'delete', skipConfirm = false) => {
+    try {
+      if (!skipConfirm) {
+        setConfirmPayload({ kind: 'project', id: projectId, name: String(projects.find(p => p.id === projectId)?.name ?? projectId), action });
+        setConfirmOpen(true);
+        return;
+      }
+
+      if (action === 'delete') {
+        await api.delete(`/projects/${projectId}`);
+        toast.success('Project deleted');
+      } else {
+        await api.patch(`/projects/${projectId}/${action}`);
+        toast.success(`Project ${action}d`);
+      }
+      await fetchProjects();
+    } catch (err) {
+      console.error('Project action failed', err);
+      toast.error('Action failed');
+    }
+  };
+
+  // Subproject actions (activate/deactivate/delete)
+  const handleSubprojectAction = async (subprojectId: string, action: 'activate'|'deactivate'|'delete', skipConfirm = false) => {
+    try {
+      if (!skipConfirm) {
+        // find name for dialog
+        const name = projects.flatMap(p => p.subprojects || []).find((s:any) => s.id === subprojectId)?.name ?? subprojectId;
+        setConfirmPayload({ kind: 'subproject', id: subprojectId, name, action });
+        setConfirmOpen(true);
+        return;
+      }
+
+      if (action === 'delete') {
+        await api.delete(`/projects/subprojects/${subprojectId}`);
+        toast.success('Subproject deleted');
+      } else {
+        await api.patch(`/projects/subprojects/${subprojectId}/${action}`);
+        toast.success(`Subproject ${action}d`);
+      }
+      await fetchProjects();
+    } catch (err) {
+      console.error('Subproject action failed', err);
+      toast.error('Action failed');
+    }
+  };
+
   // Stats
-  const totalProjects = mockProjects.length;
-  const activeProjects = mockProjects.filter(p => p.status === "active").length;
-  const totalMonthlyRevenue = mockProjects.reduce((sum, p) => {
-    const stats = getProjectStats(p.id);
-    return sum + stats.monthlyRevenue;
-  }, 0);
-  const totalACS = mockProjects.reduce((sum, p) => {
-    const stats = getProjectStats(p.id);
-    return sum + stats.totalACS;
-  }, 0);
+  const totalProjects = projects.length;
+  const activeProjects = projects.filter(p => p.status === "active").length;
+  const totalMonthlyRevenue = projects.reduce((sum, p) => sum + (Number(p.monthlyRevenue || 0)), 0);
+  const totalACS = projects.reduce((sum, p) => sum + (p.totalACS || 0), 0);
 
   return (
     <div className="p-6 animate-fade-in">
@@ -111,8 +228,133 @@ export default function Projects() {
         </Button>
       </div>
 
+      {/* Create project dialog */}
+      <AddProjectDialog
+        open={addProjectOpen}
+        onOpenChange={setAddProjectOpen}
+        onFilesChange={(files) => setPendingProjectFiles(files)}
+        onSubmit={async (data) => {
+          console.debug('Projects onSubmit called', data);
+          try {
+            const payload = {
+              name: data.name,
+              description: data.description,
+              clientId: Number(data.clientId),
+              status: data.status,
+            };
+            console.debug('POST /projects payload', payload);
+            const res = await api.post('/projects', payload);
+            console.debug('POST /projects response', res);
+            if (res.status === 201 || res.status === 200) {
+              setAddProjectOpen(false);
+              const createdId = res.data && res.data.id;
+              // Upload attachments if any
+              if (createdId && pendingProjectFiles.length > 0) {
+                try {
+                  const formData = new FormData();
+                  pendingProjectFiles.forEach(f => formData.append('files', f));
+                  formData.append('entityType', 'PROJECT');
+                  formData.append('entityId', String(createdId));
+                  await api.post('/documents/upload', formData);
+                  setPendingProjectFiles([]);
+                } catch (uploadErr) {
+                  toast.error('Project created but file upload failed');
+                }
+              }
+
+              // Add created project optimistically (if returned), then refresh from server to ensure list and metrics are accurate
+              if (res.data && res.data.id) {
+                setProjects(prev => [
+                  {
+                    id: res.data.id,
+                    name: res.data.name,
+                    description: res.data.description,
+                    clientName: res.data.client?.name || res.data.clientName || '',
+                    status: res.data.status,
+                    createdAt: res.data.createdAt,
+                    createdBy: res.data.createdBy,
+                    subprojects: res.data.subprojects || [],
+                    monthlyRevenue: res.data.monthlyRevenue,
+                    totalACS: res.data.totalACS,
+                    totalSites: res.data.totalSites,
+                  },
+                  ...prev,
+                ]);
+              }
+              // Always refresh from server to get canonical data
+              await fetchProjects();
+            } else {
+              toast.error('Failed to create project');
+              console.error('Unexpected response creating project', res);
+            }
+          } catch (err: any) {
+            console.error('Create project error caught in Projects.tsx', err);
+            const msg = err?.response?.data || err.message || 'Failed to create project';
+            toast.error(String(msg));
+            throw err; // rethrow so dialog can show error too
+          }
+        }}
+      />
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmOpen} onOpenChange={() => setConfirmOpen(false)}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{confirmPayload?.action && `${confirmPayload.action.charAt(0).toUpperCase() + confirmPayload.action.slice(1)} ${confirmPayload?.kind ? confirmPayload.kind : ''}`}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to {confirmPayload?.action} {confirmPayload?.kind} "{confirmPayload?.name}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!confirmPayload) return;
+                const { kind, id, action } = confirmPayload;
+                try {
+                  if (kind === 'project') {
+                    await handleProjectAction(id, action, true);
+                  } else {
+                    await handleSubprojectAction(id, action, true);
+                  }
+                  setConfirmOpen(false);
+                } catch (e) {
+                  // handled in handlers
+                }
+              }}>{confirmPayload?.action}</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Documents Modal */}
+      <Dialog open={docsOpen} onOpenChange={setDocsOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Documents</DialogTitle>
+            <DialogDescription>
+              {docsEntity?.kind && docsEntity?.name && `${docsEntity.kind === 'project' ? 'Project' : 'Subproject'}: ${docsEntity.name}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {docsList.length > 0 ? (
+              docsList.map(doc => (
+                <div key={doc} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium">{doc}</span>
+                  <div className="flex gap-2">
+                    <a href={docsEntity?.kind === 'project' ? `/api/projects/${docsEntity.id}/documents/${doc}?action=view` : `/api/projects/subprojects/${docsEntity.id}/documents/${doc}?action=view`} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">View</a>
+                    <a href={docsEntity?.kind === 'project' ? `/api/projects/${docsEntity.id}/documents/${doc}` : `/api/projects/subprojects/${docsEntity.id}/documents/${doc}`} download className="text-sm text-primary hover:underline">Download</a>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No documents found.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="data-card">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
@@ -127,7 +369,7 @@ export default function Projects() {
         <div className="data-card">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-status-success/10">
-              <Building2 className="w-5 h-5 text-status-success" />
+              <Archive className="w-5 h-5 text-status-success" />
             </div>
             <div>
               <div className="text-2xl font-semibold text-foreground">{activeProjects}</div>
@@ -173,33 +415,56 @@ export default function Projects() {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px] bg-secondary/50">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover border-border">
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="on-hold">On Hold</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="archived">Archived</SelectItem>
-          </SelectContent>
-        </Select>
+
+        <div className="flex items-center gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px] bg-secondary/50">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="on-hold">On Hold</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={clientFilter} onValueChange={(v) => setClientFilter(v)}>
+            <SelectTrigger className="w-[200px] bg-secondary/50">
+              <SelectValue placeholder="Client" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Clients</SelectItem>
+              {clients.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Projects List */}
       <div className="space-y-4">
         {filteredProjects.map((project) => {
           const isExpanded = expandedProjects.has(project.id);
-          const projectStats = getProjectStats(project.id);
+          const projectStats = {
+            monthlyRevenue: Number(project.monthlyRevenue || 0),
+            activeACS: project.totalACS || 0,
+            totalACS: project.totalACS || 0,
+            totalSites: project.totalSites ?? 0,
+          };
           
           return (
             <div key={project.id} className="data-card p-0 overflow-hidden">
               {/* Project Header */}
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleProject(project.id)}
-                className="w-full text-left p-5 hover:bg-secondary/30 transition-colors"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleProject(project.id); }}
+                className="w-full text-left p-5 hover:bg-secondary/30 transition-colors cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
@@ -221,7 +486,11 @@ export default function Projects() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5" />
-                          Created {project.createdAt}
+                          Created {formatDate(project.createdAt)}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5" />
+                          {project.createdBy ? `Created by ${project.createdBy}` : '—'}
                         </span>
                       </div>
                     </div>
@@ -244,13 +513,43 @@ export default function Projects() {
                       <div className="text-lg font-semibold text-foreground">{projectStats.totalSites}</div>
                       <div className="text-xs text-muted-foreground">Sites</div>
                     </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon-sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover border-border">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDocsEntity({ kind: 'project', id: project.id, name: project.name }); setDocsOpen(true); }}>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Documents
+                        </DropdownMenuItem>
+                        {project.status !== 'active' && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'activate'); }}>
+                            Activate
+                          </DropdownMenuItem>
+                        )}
+                        {project.status === 'active' && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'deactivate'); }}>
+                            Deactivate
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'delete'); }}>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Project
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <ChevronRight className={cn(
                       "w-5 h-5 text-muted-foreground transition-transform duration-200",
                       isExpanded && "rotate-90"
                     )} />
                   </div>
                 </div>
-              </button>
+              </div>
 
               {/* Subprojects */}
               {isExpanded && (
@@ -272,62 +571,76 @@ export default function Projects() {
                     </div>
                     <div className="space-y-3">
                       {project.subprojects.map((subproject) => {
-                        const subStats = getSubprojectStats(subproject.id);
+                        // For now backend returns minimal subproject fields. Guard configuration access.
+                        const config = (subproject as any).configuration;
                         return (
                           <div
                             key={subproject.id}
-                            className="bg-background rounded-lg border border-border p-4 hover:border-primary/30 transition-colors cursor-pointer"
+                            className={cn("bg-background rounded-lg border border-border p-4 hover:border-primary/30 transition-colors cursor-pointer", subproject.status !== 'active' && "opacity-60")}
                             onClick={() => handleSubprojectClick(project.id, subproject.id)}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
                                   <h5 className="font-medium text-foreground">{subproject.name}</h5>
-                                  <Badge variant="outline" className="text-xs bg-muted/50">
-                                    Config v{subproject.configuration.version}
-                                  </Badge>
+                                  {config?.version && (
+                                    <Badge variant="outline" className="text-xs bg-muted/50">
+                                      Config v{config.version}
+                                    </Badge>
+                                  )}
                                 </div>
+
+                                {subproject.description && (
+                                  <p className="text-sm text-muted-foreground mb-2">{subproject.description}</p>
+                                )}
                                 
-                                {/* Configuration Details */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground">Base Rent</div>
-                                    <div className="font-medium text-foreground flex items-center gap-1">
-                                      <IndianRupee className="w-3.5 h-3.5" />
-                                      {subproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo
+                                {/* Configuration Details (if present) */}
+                                {config ? (
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div className="space-y-1">
+                                      <div className="text-xs text-muted-foreground">Base Rent</div>
+                                      <div className="font-medium text-foreground flex items-center gap-1">
+                                        <IndianRupee className="w-3.5 h-3.5" />
+                                        {config.baseMonthlyRent.toLocaleString("en-IN")}/mo
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className="text-xs text-muted-foreground">Tenure</div>
+                                      <div className="font-medium text-foreground flex items-center gap-1">
+                                        <Calendar className="w-3.5 h-3.5" />
+                                        {config.tenureMonths} months
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className="text-xs text-muted-foreground">Installation</div>
+                                      <div className="font-medium text-foreground">
+                                        {config.installationChargeable 
+                                          ? `₹${config.installationCharge?.toLocaleString("en-IN")}`
+                                          : <span className="text-status-success">Included</span>
+                                        }
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className="text-xs text-muted-foreground">Maintenance</div>
+                                      <div className="font-medium text-foreground">
+                                        {config.maintenanceIncluded 
+                                          ? <span className="text-status-success">Included</span>
+                                          : `₹${config.maintenanceCharge?.toLocaleString("en-IN")}/mo`
+                                        }
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground">Tenure</div>
-                                    <div className="font-medium text-foreground flex items-center gap-1">
-                                      <Calendar className="w-3.5 h-3.5" />
-                                      {subproject.configuration.tenureMonths} months
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground">Installation</div>
-                                    <div className="font-medium text-foreground">
-                                      {subproject.configuration.installationChargeable 
-                                        ? `₹${subproject.configuration.installationCharge?.toLocaleString("en-IN")}`
-                                        : <span className="text-status-success">Included</span>
-                                      }
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground">Maintenance</div>
-                                    <div className="font-medium text-foreground">
-                                      {subproject.configuration.maintenanceIncluded 
-                                        ? <span className="text-status-success">Included</span>
-                                        : `₹${subproject.configuration.maintenanceCharge?.toLocaleString("en-IN")}/mo`
-                                      }
-                                    </div>
-                                  </div>
-                                </div>
+                                ) : (
+                                  <div className="text-sm text-muted-foreground">No configuration details available. This subproject does not have a locked pricing configuration yet.</div>
+                                )}
                                 
                                 <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
-                                  <span>{subStats.sitesCount} sites</span>
-                                  <span>{subStats.acsCount} ACS units</span>
-                                  <span>Created by {subproject.createdBy}</span>
+                                  <span>{(subproject.sitesCount ?? '—')} sites</span>
+                                  <span>{(subproject.acsCount ?? '—')} ACS units</span>
+                                  <span>Created by {subproject.createdBy ?? '—'}</span>
+                                  {subproject.status !== 'active' && (
+                                    <Badge variant="outline" className="text-xs bg-muted/30">{subproject.status}</Badge>
+                                  )}
                                 </div>
                               </div>
                               
@@ -353,9 +666,23 @@ export default function Projects() {
                                     View Assets
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                                    <Archive className="w-4 h-4 mr-2" />
-                                    Archive Subproject
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDocsEntity({ kind: 'subproject', id: subproject.id, name: subproject.name }); setDocsOpen(true); }}>
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    Documents
+                                  </DropdownMenuItem>
+                                  {subproject.status !== 'active' && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSubprojectAction(subproject.id, 'activate'); }}>
+                                      Activate
+                                    </DropdownMenuItem>
+                                  )}
+                                  {subproject.status === 'active' && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSubprojectAction(subproject.id, 'deactivate'); }}>
+                                      Deactivate
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSubprojectAction(subproject.id, 'delete'); }}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Subproject
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -384,11 +711,7 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Dialogs */}
-      <AddProjectDialog 
-        open={addProjectOpen} 
-        onOpenChange={setAddProjectOpen} 
-      />
+
       
       {selectedProjectForSubproject && (
         <AddSubprojectDialog 
@@ -396,6 +719,32 @@ export default function Projects() {
           onOpenChange={setAddSubprojectOpen}
           projectId={selectedProjectForSubproject.id}
           projectName={selectedProjectForSubproject.name}
+          onFilesChange={(files) => setPendingSubprojectFiles(files)}
+          onSubmit={async (data) => {
+            try {
+              const res = await api.post(`/projects/${selectedProjectForSubproject.id}/subprojects`, data);
+              const createdSubId = res.data && res.data.id;
+
+              // Upload attachments if any
+              if (createdSubId && pendingSubprojectFiles.length > 0) {
+                try {
+                  const formData = new FormData();
+                  pendingSubprojectFiles.forEach(f => formData.append('files', f));
+                  formData.append('entityType', 'SUBPROJECT');
+                  formData.append('entityId', String(createdSubId));
+                  await api.post('/documents/upload', formData);
+                  setPendingSubprojectFiles([]);
+                } catch (uploadErr) {
+                  toast.error('Subproject created but file upload failed');
+                }
+              }
+
+              setAddSubprojectOpen(false);
+              fetchProjects();
+            } catch (err) {
+              toast.error('Failed to create subproject');
+            }
+          }}
         />
       )}
     </div>

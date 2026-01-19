@@ -19,6 +19,7 @@ import {
   MapPin,
   X,
   Image as ImageIcon,
+  Eye,
 } from "lucide-react";
 import type { MediaEvidence, DocumentEvidence } from "@/types/asset";
 
@@ -179,10 +180,28 @@ export function EvidenceGallery({
                     {doc.description}
                   </p>
                 )}
+                {doc.purpose && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    Purpose: {doc.purpose}
+                  </p>
+                )}
               </div>
-              <Button variant="ghost" size="icon-sm">
-                <Download className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(`/uploads/${doc.fileUrl}`, '_blank')}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <a href={`/uploads/${doc.fileUrl}`} download={doc.fileName}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </a>
+                </Button>
+              </div>
             </div>
           ))}
 

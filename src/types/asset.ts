@@ -117,13 +117,14 @@ export interface MediaEvidence {
 
 export interface DocumentEvidence {
   id: string;
-  url: string;
+  fileUrl: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
   uploadedAt: string;
   uploadedBy: string;
   documentType: string; // invoice, certificate, manual, etc.
+  purpose?: string;
   description?: string;
   expiryDate?: string;
 }

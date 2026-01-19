@@ -35,7 +35,7 @@ import { Shield, AlertTriangle } from "lucide-react";
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
   email: z.string().email("Invalid email address"),
-  role: z.enum(["Admin", "Operations Manager", "Finance Manager", "Field Technician", "Viewer"]),
+  role: z.string().min(1, "Role is required"),
   department: z.string().min(2, "Department is required").max(50),
   sendInvite: z.boolean().default(true),
   requirePasswordReset: z.boolean().default(true),
@@ -43,13 +43,12 @@ const userSchema = z.object({
 
 type UserFormData = z.infer<typeof userSchema>;
 
-const roles = [
-  { value: "Admin", description: "Full system access", color: "text-[hsl(var(--status-error))]" },
-  { value: "Operations Manager", description: "Manage sites, installations, vendors" },
-  { value: "Finance Manager", description: "Access to finance module and reports" },
-  { value: "Field Technician", description: "Update maintenance tickets and installations" },
-  { value: "Viewer", description: "Read-only access to dashboards" },
-];
+import { useEffect } from "react";
+
+type RoleType = { id: number; name: string; description?: string };
+
+const rolesPlaceholder: RoleType[] = [];
+
 
 const departments = [
   "Operations",
@@ -68,13 +67,29 @@ interface AddUserDialogProps {
 
 export function AddUserDialog({ open, onOpenChange, onSubmit }: AddUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [roles, setRoles] = useState<RoleType[]>(rolesPlaceholder);
+
+  useEffect(() => { fetchRoles(); }, []);
+
+  async function fetchRoles() {
+    try {
+      const resp = await fetch('/api/admin/roles', { headers: { 'Content-Type': 'application/json' }, credentials: 'include' });
+      if (resp.ok) {
+        const data = await resp.json();
+        setRoles(data || []);
+      }
+    } catch (err) {
+      // ignore, fallback to placeholder
+      console.error('Failed to load roles', err);
+    }
+  }
+
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {
       name: "",
       email: "",
-      role: "Viewer",
+      role: roles.length ? roles[0].name : "",
       department: "",
       sendInvite: true,
       requirePasswordReset: true,
@@ -153,10 +168,10 @@ export function AddUserDialog({ open, onOpenChange, onSubmit }: AddUserDialogPro
                       </FormControl>
                       <SelectContent>
                         {roles.map((role) => (
-                          <SelectItem key={role.value} value={role.value}>
+                          <SelectItem key={role.id} value={role.name}>
                             <div className="flex items-center gap-2">
-                              {role.value === "Admin" && <Shield className="w-3 h-3 text-[hsl(var(--status-error))]" />}
-                              <span>{role.value}</span>
+                              {role.name.toLowerCase() === "admin" && <Shield className="w-3 h-3 text-[hsl(var(--status-error))]" />}
+                              <span>{role.name}</span>
                             </div>
                           </SelectItem>
                         ))}

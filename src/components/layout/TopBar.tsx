@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { ChangePasswordDialog } from "@/components/forms/ChangePasswordDialog";
 
 export function TopBar() {
   const [isDark, setIsDark] = useState(true);
@@ -17,6 +19,9 @@ export function TopBar() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
+
+  const { profile, logout } = useAuth();
+  const [openChangePassword, setOpenChangePassword] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-6 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -64,15 +69,16 @@ export function TopBar() {
           <DropdownMenuContent align="end" className="w-56 bg-popover border-border">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">Operations Admin</p>
-                <p className="text-xs text-muted-foreground">admin@company.com</p>
+                <p className="text-sm font-medium">{profile?.username || 'Guest'}</p>
+                <p className="text-xs text-muted-foreground">{profile?.role || ''}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setOpenChangePassword(true)}>Profile Settings</DropdownMenuItem>
             <DropdownMenuItem>Team Management</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-status-error">Sign Out</DropdownMenuItem>
+            <ChangePasswordDialog open={openChangePassword} onOpenChange={setOpenChangePassword} />
+            <DropdownMenuItem onClick={() => logout()} className="text-status-error">Sign Out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
