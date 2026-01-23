@@ -33,6 +33,7 @@ const subprojectSchema = z.object({
   description: z.string().max(500).optional(),
   baseMonthlyRent: z.number().min(100, "Minimum rent is ₹100").max(100000),
   tenureMonths: z.number().min(12, "Minimum tenure is 12 months").max(120),
+  plannedAcsCount: z.number().min(1, "At least one AC").max(10, "Max 10 ACs per site"),
   installationChargeable: z.boolean(),
   installationCharge: z.number().optional(),
   maintenanceIncluded: z.boolean(),
@@ -116,6 +117,7 @@ export function AddSubprojectDialog({
       name: "",
       baseMonthlyRent: 12000,
       tenureMonths: 36,
+      plannedAcsCount: 2,
       installationChargeable: false,
       installationCharge: 25000,
       maintenanceIncluded: true,
@@ -190,7 +192,7 @@ export function AddSubprojectDialog({
                 Pricing Configuration (Immutable)
               </h4>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="baseMonthlyRent"
@@ -229,6 +231,27 @@ export function AddSubprojectDialog({
                         />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="plannedAcsCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Planned ACs / Site
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number"
+                          {...field}
+                          onChange={e => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      <FormDescription className="text-xs text-muted-foreground">Number of AC units planned per site in this subproject (used for capacity and billing calculations)</FormDescription>
                     </FormItem>
                   )}
                 />

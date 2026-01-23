@@ -35,10 +35,18 @@ import { DeactivateClientDialog } from "./DeactivateClientDialog";
 import { DeleteClientDialog } from "./DeleteClientDialog";
 import api from "@/lib/api";
 
+// site import dialogs
+import UploadSitesDialog from "@/components/sites/UploadSitesDialog";
+import UploadResultDialog from "@/components/sites/UploadResultDialog";
+import ViewImportsDialog from "@/components/sites/ViewImportsDialog";
+
 interface Project {
   id: string;
   name: string;
   subprojects: any[];
+  monthlyRevenue?: number;
+  totalSites?: number;
+  totalACS?: number;
 }
 
 interface ClientData {
@@ -81,6 +89,14 @@ export function ViewClientDialog({ open, onOpenChange, client, onClientUpdate }:
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // import flow state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [importViewOpen, setImportViewOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeSubprojectId, setActiveSubprojectId] = useState<string | null>(null);
+  const [lastSessionId, setLastSessionId] = useState<number | null>(null);
+  const [resultOpen, setResultOpen] = useState(false);
 
   useEffect(() => {
     if (open && client) {
@@ -180,6 +196,9 @@ export function ViewClientDialog({ open, onOpenChange, client, onClientUpdate }:
                   <Badge variant={client.status === "Active" ? "default" : "secondary"}>
                     {client.status}
                   </Badge>
+                  {client.status !== 'Active' && (
+                    <div className="text-xs text-muted-foreground ml-2">Note: This client is inactive — projects under this client are archived and cannot be activated until the client is reactivated.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -282,12 +301,34 @@ export function ViewClientDialog({ open, onOpenChange, client, onClientUpdate }:
                 {projects.length > 0 ? (
                   projects.map((project) => (
                     <div key={project.id} className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between">
                       <p className="font-semibold">{project.name}</p>
-                      {project.subprojects && project.subprojects.length > 0 && (
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">{project.monthlyRevenue ? formatCurrency(project.monthlyRevenue) : '—'}</div>
+                          <div className="text-xs">Monthly Revenue</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">{project.totalACS ?? '—'}</div>
+                          <div className="text-xs">ACS Units</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-foreground">{project.totalSites ?? '—'}</div>
+                          <div className="text-xs">Sites</div>
+                        </div>
+                      </div>
+                    </div>
+                    {project.subprojects && project.subprojects.length > 0 && (
                         <div className="pl-4 mt-2 space-y-2">
                           {project.subprojects.map((subproject: any) => (
                             <div key={subproject.id} className="p-2 bg-muted rounded-lg">
-                              <p className="font-medium">{subproject.name}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium">{subproject.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Sites</button>
+                                  <button onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }} className="text-sm text-muted-foreground hover:underline">View Imports</button>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -302,7 +343,18 @@ export function ViewClientDialog({ open, onOpenChange, client, onClientUpdate }:
 
 
             <Separator />
-            
+
+            {/* Import dialogs */}
+            <UploadSitesDialog open={uploadOpen} onOpenChange={setUploadOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onUploaded={(res) => {
+              // open result dialog
+              setLastSessionId(res.sessionId);
+              setResultOpen(true);
+            }} />
+
+            <UploadResultDialog open={resultOpen} onOpenChange={setResultOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} sessionId={lastSessionId} onProcessed={() => { setResultOpen(false); setImportViewOpen(false); /* refresh projects list */ api.get(`/clients/${client?.id?.replace('CLT-','')}/projects`).then((r)=>setProjects(r.data)); }} />
+
+            <ViewImportsDialog open={importViewOpen} onOpenChange={setImportViewOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onProcessed={() => { setImportViewOpen(false); api.get(`/clients/${client?.id?.replace('CLT-','')}/projects`).then((r)=>setProjects(r.data)); }} />
+
             {/* Uploaded Documents */}
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">Uploaded Documents</h3>

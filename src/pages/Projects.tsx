@@ -28,13 +28,17 @@ import { cn } from "@/lib/utils";
 import { AddProjectDialog } from "@/components/forms/AddProjectDialog";
 import { AddSubprojectDialog } from "@/components/forms/AddSubprojectDialog";
 import api from "@/lib/api";
+import UploadSitesDialog from "@/components/sites/UploadSitesDialog";
+import UploadResultDialog from "@/components/sites/UploadResultDialog";
+import ViewImportsDialog from "@/components/sites/ViewImportsDialog";
 import { toast } from "sonner";
 
 const statusColors = {
   active: "bg-status-success/15 text-status-success",
   "on-hold": "bg-status-warning/15 text-status-warning",
   completed: "bg-status-info/15 text-status-info",
-  archived: "bg-muted text-muted-foreground",
+  // Make archived more visually distinct
+  archived: "bg-status-warning/15 text-status-warning",
 };
 
 function formatCurrency(value: number) {
@@ -71,6 +75,15 @@ export default function Projects() {
   const [docsOpen, setDocsOpen] = useState(false);
   const [docsList, setDocsList] = useState<string[]>([]);
   const [docsEntity, setDocsEntity] = useState<{ kind: 'project'|'subproject'; id: string; name: string } | null>(null);
+
+  // import flow state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [importViewOpen, setImportViewOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeSubprojectId, setActiveSubprojectId] = useState<string | null>(null);
+  const [lastSessionId, setLastSessionId] = useState<number | null>(null);
+  const [resultOpen, setResultOpen] = useState(false);
+
   const fetchProjects = async () => {
     try {
       const res = await api.get('/projects');
@@ -171,19 +184,34 @@ export default function Projects() {
         await api.delete(`/projects/${projectId}`);
         toast.success('Project deleted');
       } else {
-        await api.patch(`/projects/${projectId}/${action}`);
-        toast.success(`Project ${action}d`);
+        const res = await api.patch(`/projects/${projectId}/${action}`);
+        // If server returned a conflict message (e.g., client inactive), surface it
+        if (res && res.status === 409 && res.data) {
+          toast.error(String(res.data));
+        } else {
+          toast.success(`Project ${action}d`);
+        }
       }
       await fetchProjects();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Project action failed', err);
-      toast.error('Action failed');
+      const msg = err?.response?.data || err?.message || 'Action failed';
+      toast.error(String(msg));
     }
   };
 
   // Subproject actions (activate/deactivate/delete)
   const handleSubprojectAction = async (subprojectId: string, action: 'activate'|'deactivate'|'delete', skipConfirm = false) => {
     try {
+      // Prevent activating subproject if parent client is inactive
+      if (action === 'activate') {
+        const parentProject = projects.find(p => (p.subprojects || []).some((s:any) => s.id === subprojectId));
+        if (parentProject && parentProject.clientActive === false) {
+          toast.warning('Cannot activate subproject — the parent client is inactive.');
+          return;
+        }
+      }
+
       if (!skipConfirm) {
         // find name for dialog
         const name = projects.flatMap(p => p.subprojects || []).find((s:any) => s.id === subprojectId)?.name ?? subprojectId;
@@ -196,13 +224,18 @@ export default function Projects() {
         await api.delete(`/projects/subprojects/${subprojectId}`);
         toast.success('Subproject deleted');
       } else {
-        await api.patch(`/projects/subprojects/${subprojectId}/${action}`);
-        toast.success(`Subproject ${action}d`);
+        const res = await api.patch(`/projects/subprojects/${subprojectId}/${action}`);
+        if (res && res.status === 409 && res.data) {
+          toast.error(String(res.data));
+        } else {
+          toast.success(`Subproject ${action}d`);
+        }
       }
       await fetchProjects();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Subproject action failed', err);
-      toast.error('Action failed');
+      const msg = err?.response?.data || err?.message || 'Action failed';
+      toast.error(String(msg));
     }
   };
 
@@ -303,6 +336,12 @@ export default function Projects() {
             <DialogTitle>{confirmPayload?.action && `${confirmPayload.action.charAt(0).toUpperCase() + confirmPayload.action.slice(1)} ${confirmPayload?.kind ? confirmPayload.kind : ''}`}</DialogTitle>
             <DialogDescription>
               Are you sure you want to {confirmPayload?.action} {confirmPayload?.kind} "{confirmPayload?.name}"?
+              {confirmPayload?.action === 'deactivate' && confirmPayload?.kind === 'project' && (
+                <div className="mt-2 text-xs text-muted-foreground">This will archive the project and all its subprojects. You can restore them by activating the client (if the client is active) or reactivating the project.</div>
+              )}
+              {confirmPayload?.action === 'deactivate' && confirmPayload?.kind === 'subproject' && (
+                <div className="mt-2 text-xs text-muted-foreground">This will archive the subproject and its configuration. Sites and documents remain available.</div>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -464,7 +503,7 @@ export default function Projects() {
                 tabIndex={0}
                 onClick={() => toggleProject(project.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleProject(project.id); }}
-                className="w-full text-left p-5 hover:bg-secondary/30 transition-colors cursor-pointer"
+                className={cn("w-full text-left p-5 hover:bg-secondary/30 transition-colors cursor-pointer", project.status === 'archived' && "border-l-4 border-status-warning/20")}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
@@ -526,9 +565,15 @@ export default function Projects() {
                           Documents
                         </DropdownMenuItem>
                         {project.status !== 'active' && (
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'activate'); }}>
-                            Activate
-                          </DropdownMenuItem>
+                          project.clientActive === false ? (
+                            <DropdownMenuItem disabled>
+                              Activate (client inactive)
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'activate'); }}>
+                              Activate
+                            </DropdownMenuItem>
+                          )
                         )}
                         {project.status === 'active' && (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleProjectAction(project.id, 'deactivate'); }}>
@@ -639,8 +684,12 @@ export default function Projects() {
                                   <span>{(subproject.acsCount ?? '—')} ACS units</span>
                                   <span>Created by {subproject.createdBy ?? '—'}</span>
                                   {subproject.status !== 'active' && (
-                                    <Badge variant="outline" className="text-xs bg-muted/30">{subproject.status}</Badge>
+                                    <Badge variant="outline" className={cn("text-xs", statusColors[subproject.status] || "bg-muted text-muted-foreground")}>{subproject.status}</Badge>
                                   )}
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Sites</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }} className="text-sm text-muted-foreground hover:underline">View Imports</button>
                                 </div>
                               </div>
                               
@@ -713,6 +762,13 @@ export default function Projects() {
 
 
       
+      {/* Import dialogs */}
+      <UploadSitesDialog open={uploadOpen} onOpenChange={setUploadOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onUploaded={(res) => { setLastSessionId(res.sessionId); setResultOpen(true); }} />
+
+      <UploadResultDialog open={resultOpen} onOpenChange={setResultOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} sessionId={lastSessionId} onProcessed={() => { setResultOpen(false); setImportViewOpen(false); fetchProjects(); }} />
+
+      <ViewImportsDialog open={importViewOpen} onOpenChange={setImportViewOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onProcessed={() => { setImportViewOpen(false); fetchProjects(); }} />
+
       {selectedProjectForSubproject && (
         <AddSubprojectDialog 
           open={addSubprojectOpen} 
