@@ -40,6 +40,7 @@ export interface Subproject {
   status: "active" | "archived";
   sitesCount: number;
   acsCount: number;
+  plannedAcsCount?: number;
 }
 
 export interface Project {

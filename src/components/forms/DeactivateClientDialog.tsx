@@ -26,8 +26,8 @@ export function DeactivateClientDialog({
 }: DeactivateClientDialogProps) {
   const title = isActive ? "Deactivate Client" : "Activate Client";
   const description = isActive
-    ? `Are you sure you want to deactivate the client ${clientName}? This action will mark the client as inactive and prevent any new transactions.`
-    : `Are you sure you want to activate the client ${clientName}? This action will mark the client as active.`;
+    ? `Are you sure you want to deactivate the client ${clientName}? This action will mark the client as inactive, archive all projects and subprojects under this client, and prevent activating those projects while the client remains inactive.`
+    : `Are you sure you want to activate the client ${clientName}? This action will mark the client as active and restore projects/subprojects that were archived due to client deactivation.`;
   const buttonText = isActive ? "Deactivate" : "Activate";
   const buttonVariant = isActive ? "destructive" : "default";
 
