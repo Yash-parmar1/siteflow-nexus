@@ -95,14 +95,14 @@ export default function UploadResultDialog({ open, onOpenChange, projectId, subp
 
                 <div className="space-y-2">
                   <div className="text-sm font-semibold">Summary</div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-6 gap-2">
                     <div className="p-2 bg-muted rounded text-center">
                       <div className="text-xs text-muted-foreground">Status</div>
                       <div className="text-sm font-medium">{session.session?.status}</div>
                     </div>
                     <div className="p-2 bg-muted rounded text-center">
                       <div className="text-xs text-muted-foreground">Created</div>
-                      <div className="text-sm font-medium">{session.summary?.created ?? '—'}</div>
+                      <div className="text-sm font-medium">{session.summary?.created ?? session.summary?.createdAssets ?? '—'}</div>
                     </div>
                     <div className="p-2 bg-muted rounded text-center">
                       <div className="text-xs text-muted-foreground">Updated</div>
@@ -112,12 +112,17 @@ export default function UploadResultDialog({ open, onOpenChange, projectId, subp
                       <div className="text-xs text-muted-foreground">Skipped</div>
                       <div className="text-sm font-medium">{session.summary?.skipped ?? 0}</div>
                     </div>
-                    {failedRowsCount > 0 && (
-                      <div className="p-2 bg-destructive/10 rounded text-center">
-                        <div className="text-xs text-destructive">Failed/Warnings</div>
-                        <div className="text-sm font-medium text-destructive">{failedRowsCount}</div>
-                      </div>
-                    )}
+
+                    <div className="p-2 bg-destructive/10 rounded text-center">
+                      <div className="text-xs text-destructive">Errors</div>
+                      <div className="text-sm font-medium text-destructive">{session.summary?.errors ?? 0}</div>
+                    </div>
+
+                    <div className="p-2 bg-yellow-100 rounded text-center">
+                      <div className="text-xs text-yellow-800">Warnings</div>
+                      <div className="text-sm font-medium text-yellow-800">{session.summary?.warnings ?? 0}</div>
+                    </div>
+
                   </div>
                 </div>
 

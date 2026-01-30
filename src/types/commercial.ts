@@ -9,6 +9,8 @@ export interface ConfigurationSnapshot {
   // Pricing rules
   baseMonthlyRent: number;
   tenureMonths: number;
+  stabilizerEnabled?: boolean;
+  firstMonthRent?: number;
   
   // Installation rules
   installationChargeable: boolean;
@@ -72,6 +74,8 @@ export interface ACSUnitWithTenure {
   // Installation dates
   installDate?: string;
   activationDate?: string;
+  // Indoor / Outdoor flag
+  isIndoor?: boolean;
   
   // Tenure tracking (copied from configuration at activation)
   tenureMonths?: number;

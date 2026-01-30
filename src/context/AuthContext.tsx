@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import api from '../lib/api';
 
 interface UserProfile {
@@ -24,6 +24,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('token'));
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshProfile();
+    }
+  }, [isAuthenticated]);
+
   const refreshProfile = async () => {
     try {
       const resp = await api.get('/auth/me');
@@ -38,8 +44,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (token: string) => {
     localStorage.setItem('token', token);
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setIsAuthenticated(true);
     await refreshProfile();
+    setIsAuthenticated(true);
   };
 
   const logout = () => {

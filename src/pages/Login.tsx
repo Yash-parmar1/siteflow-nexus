@@ -25,7 +25,7 @@ export default function Login() {
     try {
       const response = await api.post("/auth/login", { username, password });
       const { jwt } = response.data;
-      login(jwt);
+      await login(jwt);
       
       toast({
         title: "Login successful",

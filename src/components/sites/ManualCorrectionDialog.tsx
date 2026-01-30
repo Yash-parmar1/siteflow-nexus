@@ -43,13 +43,39 @@ export default function ManualCorrectionDialog({
       api
         .get(`/projects/${projectId}/subprojects/${subprojectId}/uploads/${sessionId}`)
         .then((res) => {
-          const data = res.data as FileUploadSession;
-          setSession(data);
-          
+          const payload: any = res.data;
+
+          // Prefer parsed failedRows if present, otherwise derive failed rows from rows (status ERROR/WARNING/SKIPPED)
+          const sessionObj = payload.session || payload;
+          let failedRowsSource: any[] = [];
+
+          if (Array.isArray(payload.failedRows) && payload.failedRows.length > 0) {
+            // Ensure items have consistent shape (rowNumber, siteCode, message, isError, rowData)
+            failedRowsSource = payload.failedRows.map((r: any) => ({
+              rowNumber: r.rowNumber ?? r.row ?? 0,
+              siteCode: r.siteCode ?? r.site_code ?? (r.rowData && r.rowData.site_code) ?? null,
+              message: r.message ?? (Array.isArray(r.errors) && r.errors.length ? r.errors.join(', ') : (Array.isArray(r.warnings) && r.warnings.length ? r.warnings.join(', ') : '')),
+              isError: !!r.isError || (r.status === 'ERROR') || false,
+              rowData: r.rowData ?? r.row_data ?? r.data ?? null,
+            }));
+          } else if (Array.isArray(payload.rows) && payload.rows.length > 0) {
+            failedRowsSource = payload.rows
+              .filter((r: any) => ["ERROR", "WARNING", "SKIPPED"].includes(r.status))
+              .map((r: any) => ({
+                rowNumber: r.rowNumber ?? r.row ?? 0,
+                siteCode: r.siteCode ?? r.site_code ?? (r.rowData && r.rowData.site_code) ?? null,
+                message: r.message ?? r.warningMessage ?? (Array.isArray(r.errors) && r.errors.length ? r.errors.join(', ') : (Array.isArray(r.warnings) && r.warnings.length ? r.warnings.join(', ') : '')),
+                isError: r.status === 'ERROR',
+                rowData: r.rowData ?? r.row_data ?? r.data ?? null,
+              }));
+          }
+
+          setSession({ ...sessionObj, failedRows: failedRowsSource });
+
           const initialEdits: Record<number, Record<string, any>> = {};
-          if (Array.isArray(data.failedRows)) {
-            data.failedRows.forEach((row: RowResult) => {
-              if (row.rowData) {
+          if (Array.isArray(failedRowsSource)) {
+            failedRowsSource.forEach((row: any) => {
+              if (row.rowData && typeof row.rowData === 'object') {
                 initialEdits[row.rowNumber] = { ...row.rowData };
               }
             });
@@ -129,7 +155,7 @@ export default function ManualCorrectionDialog({
     setIsSubmitting(true);
     try {
       await api.post(
-        `/projects/${projectId}/subprojects/${subprojectId}/uploads/${sessionId}/discard-failed`
+        `/projects/${projectId}/subprojects/${subprojectId}/uploads/${sessionId}/discard-failed?keepWarnings=true`
       );
       toast.success("Failed rows discarded");
       onOpenChange(false);
