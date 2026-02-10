@@ -46,6 +46,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { mockACSUnits, mockProjects, getSubprojectById } from "@/data/mockData";
 import { AddUnitDialog } from "@/components/forms/AddUnitDialog";
+import { useAppData, type AssetData } from "@/context/AppDataContext";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   Operational: { color: "status-success", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
@@ -58,6 +59,7 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
 export default function Assets() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data: appData } = useAppData();
   
   // Read filters from URL
   const urlProjectId = searchParams.get("projectId") || "";
@@ -71,6 +73,39 @@ export default function Assets() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [addUnitOpen, setAddUnitOpen] = useState(false);
 
+  // Map live assets into the same shape the page expects, falling back to mockACSUnits
+  const liveUnits = appData?.assets?.length
+    ? appData.assets.map((a: AssetData) => ({
+        id: String(a.id),
+        serialNumber: a.serialNumber ?? "",
+        model: a.model ?? a.manufacturer ?? "Unknown",
+        siteId: a.siteId != null ? String(a.siteId) : "",
+        siteName: a.siteName ?? "Unassigned",
+        location: a.locationInSite ?? "",
+        status: a.status === "ACTIVE" ? "Operational"
+          : a.status === "MAINTENANCE" ? "Under Maintenance"
+          : a.status === "FAULTY" ? "Faulty"
+          : a.status === "PENDING" ? "Pending Install"
+          : a.status === "IN_TRANSIT" ? "In Transit"
+          : a.status ?? "Operational",
+        installDate: "-",
+        lastMaintenance: a.lastMaintenanceDate ?? "-",
+        nextMaintenance: a.nextMaintenanceDate ?? "-",
+        warrantyExpiry: a.warrantyExpiryDate ?? "-",
+        openTickets: 0,
+        projectId: "",
+        projectName: "",
+        subprojectId: "",
+        subprojectName: "",
+        configVersion: "",
+        configuredRent: a.monthlyRent ?? 0,
+        tenureMonths: 0,
+        rentEndDate: "-",
+      }))
+    : null;
+
+  const units = liveUnits ?? mockACSUnits;
+
   // Get subproject info if filtered
   const subprojectInfo = urlSubprojectId ? getSubprojectById(urlSubprojectId) : null;
   
@@ -81,7 +116,7 @@ export default function Assets() {
   const selectedProject = mockProjects.find(p => p.id === projectFilter);
   const subprojectOptions = selectedProject?.subprojects.map(s => ({ id: s.id, name: s.name })) || [];
 
-  const filteredUnits = mockACSUnits.filter((unit) => {
+  const filteredUnits = units.filter((unit) => {
     const matchesSearch =
       unit.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       unit.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||

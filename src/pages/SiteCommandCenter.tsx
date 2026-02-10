@@ -6,9 +6,10 @@ import { InstallationTracking } from "@/components/sites/InstallationTracking";
 import { MaintenanceTickets } from "@/components/sites/MaintenanceTickets";
 import { FinanceSnapshot } from "@/components/sites/FinanceSnapshot";
 import { Info } from "lucide-react";
+import { useAppData } from "@/context/AppDataContext";
 
-// Mock data for site details with project binding
-const getSiteData = (siteId: string) => ({
+// Fallback mock data for site details with project binding
+const getFallbackSiteData = (siteId: string) => ({
   id: siteId,
   name: "Metro Tower - Block A",
   location: "Mumbai, Maharashtra",
@@ -30,7 +31,7 @@ const getSiteData = (siteId: string) => ({
   maintenanceIncluded: true,
 });
 
-const mockTimelineEvents = [
+const fallbackTimelineEvents = [
   {
     id: "1",
     stage: "Started",
@@ -72,8 +73,8 @@ const mockTimelineEvents = [
   },
 ];
 
-// Mock ACS units with individual tenure tracking
-const mockACSUnits = [
+// Fallback ACS units with individual tenure tracking
+const fallbackACSUnits = [
   {
     id: "acs-001",
     serialNumber: "ACS-MT-001",
@@ -144,7 +145,7 @@ const mockACSUnits = [
   },
 ];
 
-const mockInstallations = [
+const fallbackInstallations = [
   {
     id: "inst-001",
     docketId: "DOC-2024-0125",
@@ -172,7 +173,7 @@ const mockInstallations = [
   },
 ];
 
-const mockTickets = [
+const fallbackTickets = [
   {
     id: "tkt-001",
     title: "Cooling efficiency below threshold",
@@ -193,7 +194,7 @@ const mockTickets = [
   },
 ];
 
-const mockFinanceData = {
+const fallbackFinanceData = {
   rentStartDate: "Dec 20, 2023",
   monthlyRent: 45000, // 3 active ACS x 15000
   totalRevenue: 90000,
@@ -204,14 +205,109 @@ const mockFinanceData = {
 
 export default function SiteCommandCenter() {
   const { siteId } = useParams();
-  const site = getSiteData(siteId || "");
+  const { data: appData } = useAppData();
+  const navigate = useNavigate();
+
+  // Build live site data from appData, fallback to hardcoded
+  const liveSite = appData?.sites?.find((s) => String(s.id) === siteId);
+  const site = liveSite
+    ? {
+        id: String(liveSite.id),
+        name: liveSite.name,
+        location: liveSite.location ?? "",
+        stage: liveSite.stage ?? "WIP",
+        progress: liveSite.progress ?? 0,
+        acsPlanned: liveSite.acsPlanned ?? 0,
+        acsInstalled: liveSite.acsInstalled ?? 0,
+        hasDelay: liveSite.hasDelay ?? false,
+        delayDays: liveSite.delayDays ?? 0,
+        projectId: liveSite.projectId ? String(liveSite.projectId) : "",
+        projectName: liveSite.projectName ?? "",
+        subprojectId: liveSite.subprojectId ? String(liveSite.subprojectId) : "",
+        subprojectName: liveSite.subprojectName ?? "",
+        configVersion: "1.0",
+        configuredRent: liveSite.configuredRent ?? 0,
+        configuredTenure: liveSite.configuredTenure ?? 36,
+        installationIncluded: false,
+        maintenanceIncluded: true,
+      }
+    : getFallbackSiteData(siteId || "");
+
+  // Build live ACS units from assets filtered by site
+  const siteAssets = appData?.assets?.filter((a) => String(a.siteId) === siteId);
+  const liveACSUnits = siteAssets?.length
+    ? siteAssets.map((a, idx) => ({
+        id: String(a.id ?? idx),
+        serialNumber: a.serialNumber ?? `ACS-${idx + 1}`,
+        model: a.model ?? "N/A",
+        location: a.locationInSite ?? "",
+        status: (a.status === "ACTIVE" ? "operational" : a.status === "MAINTENANCE" ? "maintenance" : "pending") as "operational" | "maintenance" | "pending",
+        installDate: undefined as string | undefined,
+        activationDate: undefined as string | undefined,
+        tenureMonths: 36,
+        rentStartDate: undefined as string | undefined,
+        rentEndDate: undefined as string | undefined,
+        contractStatus: (a.status === "ACTIVE" ? "active" : "pending") as "active" | "pending",
+        daysRemaining: undefined as number | undefined,
+        monthlyRent: a.monthlyRent ?? 0,
+        configurationVersion: "1.0",
+      }))
+    : null;
+  const acsUnits = liveACSUnits ?? fallbackACSUnits;
+
+  // Build live tickets from maintenance tickets filtered by site
+  const siteTickets = appData?.maintenanceTickets?.filter((t) => String(t.siteId) === siteId);
+  const statusMap: Record<string, string> = { RAISED: "open", INSPECTED: "in-progress", QUOTED: "in-progress", APPROVED: "in-progress", REPAIRED: "resolved", CLOSED: "resolved" };
+  const priorityMap: Record<string, string> = { LOW: "low", MEDIUM: "medium", HIGH: "high", CRITICAL: "high" };
+  const liveTickets = siteTickets?.length
+    ? siteTickets.map((t, idx) => ({
+        id: `tkt-${String(t.id ?? idx + 1).padStart(3, "0")}`,
+        title: t.title ?? "Untitled",
+        priority: (priorityMap[t.priority] ?? "medium") as "high" | "medium" | "low",
+        status: (statusMap[t.status] ?? "open") as "open" | "in-progress" | "resolved",
+        assignee: t.assignedTo ?? "-",
+        createdAt: t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+        acsUnit: t.acAssetSerial ?? "N/A",
+      }))
+    : null;
+  const tickets = liveTickets ?? fallbackTickets;
+
+  // Build live installations filtered by site
+  const siteInstallations = appData?.installations?.filter((i) => String(i.siteId) === siteId);
+  const installShipmentMap: Record<string, string> = { PENDING: "pending", IN_TRANSIT: "in-transit", DELIVERED: "delivered", INSTALLED: "installed" };
+  const liveInstallations = siteInstallations?.length
+    ? siteInstallations.map((i, idx) => ({
+        id: `inst-${String(idx + 1).padStart(3, "0")}`,
+        docketId: i.bookingId ?? `DOC-${idx + 1}`,
+        shipmentStatus: (installShipmentMap[i.shipmentStatus] ?? "pending") as "pending" | "in-transit" | "delivered" | "installed",
+        eta: i.eta ?? undefined,
+        installer: i.installer ?? "-",
+        unitsCount: i.unitsCount ?? 1,
+        hasEvidence: false,
+      }))
+    : null;
+  const installations = liveInstallations ?? fallbackInstallations;
+
+  // Build live finance data
+  const liveFinanceData = appData?.finance
+    ? {
+        rentStartDate: site.configuredRent ? "Active" : "-",
+        monthlyRent: acsUnits.filter((u) => u.status === "operational").length * (site.configuredRent || 15000),
+        totalRevenue: appData.finance.monthlyRevenue ?? 0,
+        totalCosts: (appData.finance.totalMaintenanceCost ?? 0) + (appData.finance.totalInstallationCost ?? 0),
+        netProfit: appData.finance.netProfit ?? 0,
+        profitMargin: appData.finance.monthlyRevenue ? Math.round(((appData.finance.netProfit ?? 0) / appData.finance.monthlyRevenue) * 1000) / 10 : 0,
+      }
+    : null;
+  const financeData = liveFinanceData ?? fallbackFinanceData;
+
+  // Timeline events (kept as fallback - no backend source yet)
+  const timelineEvents = fallbackTimelineEvents;
 
   // Calculate aggregate contract stats
-  const activeContracts = mockACSUnits.filter(u => u.contractStatus === "active").length;
-  const expiringSoon = mockACSUnits.filter(u => (u.contractStatus as string) === "expiring-soon").length;
-  const pendingActivation = mockACSUnits.filter(u => u.status === "pending").length;
-
-  const navigate = useNavigate();
+  const activeContracts = acsUnits.filter(u => u.contractStatus === "active").length;
+  const expiringSoon = acsUnits.filter(u => (u.contractStatus as string) === "expiring-soon").length;
+  const pendingActivation = acsUnits.filter(u => u.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -221,7 +317,7 @@ export default function SiteCommandCenter() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Column - Timeline */}
           <div className="xl:col-span-1">
-            <SiteTimeline events={mockTimelineEvents} />
+            <SiteTimeline events={timelineEvents} />
           </div>
 
           {/* Right Column - Details */}
@@ -266,7 +362,7 @@ export default function SiteCommandCenter() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {mockACSUnits.map((unit) => (
+                {acsUnits.map((unit) => (
                   <ACSContractCard key={unit.id} unit={unit} onClick={() => navigate(`/assets/${unit.id}`)} />
                 ))}
               </div>
@@ -274,12 +370,12 @@ export default function SiteCommandCenter() {
 
             {/* Two Column Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <InstallationTracking installations={mockInstallations} />
-              <MaintenanceTickets tickets={mockTickets} />
+              <InstallationTracking installations={installations} />
+              <MaintenanceTickets tickets={tickets} />
             </div>
 
             {/* Finance Snapshot */}
-            <FinanceSnapshot data={mockFinanceData} />
+            <FinanceSnapshot data={financeData} />
           </div>
         </div>
       </div>

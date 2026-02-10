@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import { AppDataProvider } from "@/context/AppDataContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
@@ -27,6 +28,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <AppDataProvider>
       <Toaster />
       <Sonner />
       <Routes>
@@ -59,6 +61,7 @@ const App = () => (
           />
         </Route>
       </Routes>
+      </AppDataProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
