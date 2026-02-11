@@ -105,8 +105,8 @@ const mockAsset: ACSAsset = {
       { id: "v1", url: "", thumbnailUrl: "", fileName: "installation_walkthrough.mp4", fileSize: 45000000, mimeType: "video/mp4", uploadedAt: "2024-01-15T14:30:00Z", uploadedBy: "Rajesh Kumar", caption: "Complete installation walkthrough" },
     ],
     documents: [
-      { id: "d1", url: "", fileName: "installation_checklist.pdf", fileSize: 150000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:35:00Z", uploadedBy: "Rajesh Kumar", documentType: "checklist", description: "Signed installation checklist" },
-      { id: "d2", url: "", fileName: "warranty_card.pdf", fileSize: 80000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:40:00Z", uploadedBy: "Rajesh Kumar", documentType: "warranty", description: "Manufacturer warranty card" },
+      { id: "d1", fileUrl: "", fileName: "installation_checklist.pdf", fileSize: 150000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:35:00Z", uploadedBy: "Rajesh Kumar", documentType: "checklist", description: "Signed installation checklist" },
+      { id: "d2", fileUrl: "", fileName: "warranty_card.pdf", fileSize: 80000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:40:00Z", uploadedBy: "Rajesh Kumar", documentType: "warranty", description: "Manufacturer warranty card" },
     ],
     qualityCheckPassed: true,
     qualityCheckedBy: "Amit Verma",

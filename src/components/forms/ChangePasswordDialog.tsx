@@ -1,15 +1,18 @@
 import { useState } from "react";
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogFooter,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { Lock } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -63,35 +66,51 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-background border-border">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Change Password</AlertDialogTitle>
-        </AlertDialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[440px] bg-background border-border">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-primary" />
+            Change Password
+          </DialogTitle>
+          <DialogDescription>
+            Enter your current password and choose a new one.
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Current Password</Label>
             <Input
+              id="current-password"
               type="password"
               name="current-password"
               autoComplete="current-password"
-              placeholder="Current password"
+              placeholder="Enter current password"
               value={oldPassword}
               onChange={(e) => setOldPassword(e.target.value)}
               required
             />
+          </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
             <Input
+              id="new-password"
               type="password"
               name="new-password"
               autoComplete="new-password"
-              placeholder="New password"
+              placeholder="Enter new password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
             />
+          </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm New Password</Label>
             <Input
+              id="confirm-password"
               type="password"
               name="confirm-password"
               autoComplete="new-password"
@@ -102,7 +121,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
             />
           </div>
 
-          <AlertDialogFooter>
+          <DialogFooter className="pt-4">
             <Button
               type="button"
               variant="outline"
@@ -115,9 +134,9 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
             <Button type="submit" disabled={loading}>
               {loading ? "Saving..." : "Change Password"}
             </Button>
-          </AlertDialogFooter>
+          </DialogFooter>
         </form>
-      </AlertDialogContent>
-    </AlertDialog>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -64,6 +64,11 @@ interface ClientData {
   address: string;
   outstandingAmount: number;
   paymentStatus: string;
+  gstNumber?: string;
+  tradeName?: string;
+  notes?: string;
+  contractStartDate?: string | null;
+  contractEndDate?: string | null;
 }
 
 interface ViewClientDialogProps {
@@ -325,8 +330,8 @@ export function ViewClientDialog({ open, onOpenChange, client, onClientUpdate }:
                               <div className="flex items-center justify-between">
                                 <p className="font-medium">{subproject.name}</p>
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Sites</button>
-                                  <button onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }} className="text-sm text-muted-foreground hover:underline">View Imports</button>
+                                  <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }}>Add Sites</Button>
+                                  <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground" onClick={() => { setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }}>View Imports</Button>
                                 </div>
                               </div>
                             </div>

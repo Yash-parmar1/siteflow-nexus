@@ -244,7 +244,7 @@ export default function Admin() {
                         <div className="flex items-center gap-2">
                           <Select defaultValue="user" onValueChange={(val) => setPendingRoles(prev => ({ ...prev, [p.id]: val }))}><SelectTrigger className="w-[140px] bg-secondary/50"><SelectValue placeholder="Select Role" /></SelectTrigger><SelectContent>{roles.map((r) => (<SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>))}</SelectContent></Select>
                           <Button size="sm" onClick={() => approvePendingUser(p.id, pendingRoles[p.id] || 'user')}><CheckCircle2 className="w-4 h-4 mr-2" />Approve</Button>
-                          <Button size="ghost" className="text-[hsl(var(--status-error))]" onClick={() => declinePendingUser(p.id)}><XCircle className="w-4 h-4 mr-2" />Decline</Button>
+                          <Button variant="ghost" size="sm" className="text-[hsl(var(--status-error))]" onClick={() => declinePendingUser(p.id)}><XCircle className="w-4 h-4 mr-2" />Decline</Button>
                         </div>
                       </div>
                     ))}
@@ -321,8 +321,8 @@ export default function Admin() {
       </Tabs>
 
       <AddUserDialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog} />
-      <EditUserDialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} user={selectedUser} />
-      <DeactivateUserDialog open={showDeactivateUserDialog} onOpenChange={setShowDeactivateUserDialog} user={selectedUser} />
+      <EditUserDialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} user={selectedUser ? { id: selectedUser.id, name: selectedUser.displayName || selectedUser.username || selectedUser.email || '', email: selectedUser.email || '', role: selectedUser.role || '', status: selectedUser.active ? 'Active' : 'Inactive' } : null} />
+      <DeactivateUserDialog open={showDeactivateUserDialog} onOpenChange={setShowDeactivateUserDialog} user={selectedUser ? { id: selectedUser.id, name: selectedUser.displayName || selectedUser.username || selectedUser.email || '', email: selectedUser.email || '', status: selectedUser.active ? 'Active' : 'Inactive' } : null} />
       <DeleteUserDialog
         open={showDeleteUserDialog}
         onOpenChange={setShowDeleteUserDialog}
