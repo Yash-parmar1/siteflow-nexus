@@ -42,8 +42,8 @@ const clientSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number is required").max(15),
   address: z.string().min(2, "Address is required").max(200),
-  gstNumber: z.string().min(15, "GST number must be 15 characters").max(15),
-  tradeName: z.string().min(2, "Trade name is required").max(100),
+  gstNumber: z.string().max(15).optional().or(z.literal("")),
+  tradeName: z.string().max(100).optional().or(z.literal("")),
   notes: z.string().max(500).optional(),
   contractStartDate: z.string().optional().nullable(),
   contractEndDate: z.string().optional().nullable(),
@@ -58,8 +58,8 @@ interface ClientData {
   email: string;
   phone: string;
   address: string;
-  gstNumber: string;
-  tradeName: string;
+  gstNumber?: string;
+  tradeName?: string;
   notes?: string;
   contractStartDate?: string | null;
   contractEndDate?: string | null;

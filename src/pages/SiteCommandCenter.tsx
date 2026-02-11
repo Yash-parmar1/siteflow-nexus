@@ -281,8 +281,8 @@ export default function SiteCommandCenter() {
         docketId: i.bookingId ?? `DOC-${idx + 1}`,
         shipmentStatus: (installShipmentMap[i.shipmentStatus] ?? "pending") as "pending" | "in-transit" | "delivered" | "installed",
         eta: i.eta ?? undefined,
-        installer: i.installer ?? "-",
-        unitsCount: i.unitsCount ?? 1,
+        installer: (i as any).installer ?? "-",
+        unitsCount: (i as any).unitsCount ?? 1,
         hasEvidence: false,
       }))
     : null;

@@ -102,13 +102,13 @@ export function TopBar() {
               <DropdownMenuItem onClick={() => setOpenChangePassword(true)}>Profile Settings</DropdownMenuItem>
               <DropdownMenuItem>Team Management</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <ChangePasswordDialog open={openChangePassword} onOpenChange={setOpenChangePassword} />
               <DropdownMenuItem onClick={() => logout()} className="text-status-error">Sign Out</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
       <NotificationDialog open={openNotifications} onOpenChange={setOpenNotifications} />
+      <ChangePasswordDialog open={openChangePassword} onOpenChange={setOpenChangePassword} />
     </>
   );
 }
