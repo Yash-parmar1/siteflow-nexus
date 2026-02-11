@@ -11,8 +11,10 @@ import { Progress } from "@/components/ui/progress";
 import { Search, Download, Plus, TrendingUp, ArrowUpRight, CheckCircle2, Clock, Wallet, MoreHorizontal, Eye, Send } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { useAppData } from "@/context/AppDataContext";
 
-const financialSummary = { monthlyRevenue: 5530000, outstanding: 551000, collected: 4979000, costs: 1250000, netProfit: 4280000, profitMargin: 77.4 };
+// Hardcoded fallback data (kept for reference)
+const fallbackFinancialSummary = { monthlyRevenue: 5530000, outstanding: 551000, collected: 4979000, costs: 1250000, netProfit: 4280000, profitMargin: 77.4 };
 const invoices = [
   { id: "INV-2024-0156", client: "Metro Properties Ltd.", amount: 1250000, dueDate: "Jan 05, 2025", status: "Pending", issuedDate: "Dec 20, 2024", sites: 4 },
   { id: "INV-2024-0155", client: "Phoenix Group", amount: 980000, dueDate: "Dec 28, 2024", status: "Overdue", issuedDate: "Dec 13, 2024", sites: 3 },
@@ -30,9 +32,31 @@ const statusConfig: Record<string, { color: string; bgColor: string }> = { Paid:
 
 export default function Finance() {
   const { toast } = useToast();
+  const { data: appData } = useAppData();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCreateInvoiceDialog, setShowCreateInvoiceDialog] = useState(false);
+
+  // Build live financial summary from backend data, fallback to hardcoded
+  const liveFinancialSummary = appData?.finance
+    ? (() => {
+        const revenue = appData.finance.monthlyRevenue ?? 0;
+        const costs = (appData.finance.totalMaintenanceCost ?? 0) + (appData.finance.totalInstallationCost ?? 0);
+        const net = appData.finance.netProfit ?? revenue - costs;
+        const collected = revenue > 0 ? revenue - (revenue * 0.1) : 0; // estimate 90% collected
+        const outstanding = revenue - collected;
+        return {
+          monthlyRevenue: revenue,
+          outstanding,
+          collected,
+          costs,
+          netProfit: net,
+          profitMargin: revenue > 0 ? Math.round((net / revenue) * 1000) / 10 : 0,
+        };
+      })()
+    : null;
+
+  const financialSummary = liveFinancialSummary ?? fallbackFinancialSummary;
 
   const formatCurrency = (amount: number) => amount >= 10000000 ? `₹${(amount / 10000000).toFixed(2)}Cr` : amount >= 100000 ? `₹${(amount / 100000).toFixed(1)}L` : `₹${amount.toLocaleString()}`;
   const filteredInvoices = invoices.filter((invoice) => {

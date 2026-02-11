@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AddInstallationDialog } from "@/components/forms/AddInstallationDialog";
+import { ImportInstallationsDialog } from "@/components/forms/ImportInstallationsDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ import {
   ArrowRight,
   FileText,
   Camera,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,8 +47,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAppData, type InstallationData } from "@/context/AppDataContext";
 
-// Mock data for installations
+// Hardcoded fallback data (kept for reference)
 const mockInstallations = [
   {
     id: "INS-001",
@@ -160,8 +163,38 @@ export default function Installations() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const { data: appData } = useAppData();
 
-  const filteredInstallations = mockInstallations.filter((inst) => {
+  // Map live installation data from backend, or fallback to hardcoded mockInstallations
+  const liveInstallations = appData?.installations?.length
+    ? appData.installations.map((inst: InstallationData) => ({
+        id: `INS-${String(inst.id).padStart(3, "0")}`,
+        docketId: inst.bookingId ?? `DOC-${inst.id}`,
+        site: inst.siteName ?? "Unknown",
+        siteId: String(inst.siteId),
+        units: 1,
+        status: inst.shipmentStatus === "PENDING" ? "Pending Dispatch"
+          : inst.shipmentStatus === "IN_TRANSIT" ? "In Transit"
+          : inst.shipmentStatus === "DELIVERED" ? "Scheduled"
+          : inst.shipmentStatus === "INSTALLED" ? "Completed"
+          : inst.shipmentStatus ?? "Pending Dispatch",
+        progress: inst.shipmentStatus === "INSTALLED" ? 100
+          : inst.shipmentStatus === "DELIVERED" ? 75
+          : inst.shipmentStatus === "IN_TRANSIT" ? 40
+          : 5,
+        shipmentDate: inst.createdAt ? new Date(inst.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+        eta: inst.eta ?? "-",
+        installer: "-",
+        installerContact: "-",
+        priority: "Medium",
+        notes: inst.remarks ?? "",
+      }))
+    : null;
+
+  const installations = liveInstallations ?? mockInstallations;
+
+  const filteredInstallations = installations.filter((inst) => {
     const matchesSearch =
       inst.docketId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inst.site.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -173,10 +206,10 @@ export default function Installations() {
   const statuses = ["all", "Pending Dispatch", "In Transit", "Scheduled", "Installing", "Completed", "Delayed"];
 
   // Stats
-  const totalInstallations = mockInstallations.length;
-  const inProgress = mockInstallations.filter((i) => ["In Transit", "Installing", "Scheduled"].includes(i.status)).length;
-  const completed = mockInstallations.filter((i) => i.status === "Completed").length;
-  const delayed = mockInstallations.filter((i) => i.status === "Delayed").length;
+  const totalInstallations = installations.length;
+  const inProgress = installations.filter((i) => ["In Transit", "Installing", "Scheduled"].includes(i.status)).length;
+  const completed = installations.filter((i) => i.status === "Completed").length;
+  const delayed = installations.filter((i) => i.status === "Delayed").length;
 
   return (
     <div className="p-6 animate-fade-in">
@@ -192,6 +225,10 @@ export default function Installations() {
           <Button variant="outline" size="default">
             <Download className="w-4 h-4" />
             Export
+          </Button>
+          <Button variant="outline" size="default" onClick={() => setShowImportDialog(true)}>
+            <Upload className="w-4 h-4" />
+            Import
           </Button>
           <Button size="default" onClick={() => setShowAddDialog(true)}>
             <Plus className="w-4 h-4" />
@@ -387,6 +424,7 @@ export default function Installations() {
       )}
 
       <AddInstallationDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
+      <ImportInstallationsDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { MapPin, Box, AlertTriangle, TrendingUp, Clock, CheckCircle2, ArrowUpRight, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAppData } from "@/context/AppDataContext";
 
 interface MetricCardProps { title: string; value: string | number; change?: string; changeType?: "positive" | "negative" | "neutral"; icon: React.ReactNode; onClick?: () => void; }
 
@@ -17,14 +18,15 @@ function MetricCard({ title, value, change, changeType = "neutral", icon, onClic
   );
 }
 
-const recentActivity = [
+// Hardcoded fallback data (kept for reference)
+const fallbackRecentActivity = [
   { id: 1, type: "installation", message: "4 ACS units installed at Metro Tower - Block A", time: "2 hours ago", status: "success", link: "/site/site-001" },
   { id: 2, type: "ticket", message: "High priority ticket opened for Cyber Hub Tower 5", time: "4 hours ago", status: "warning", link: "/maintenance" },
   { id: 3, type: "site", message: "DLF Cyber City Phase 3 moved to WTS stage", time: "6 hours ago", status: "info", link: "/site/site-005" },
   { id: 4, type: "finance", message: "Rent collection completed for 12 sites", time: "1 day ago", status: "success", link: "/finance" },
 ];
 
-const alertSites = [
+const fallbackAlertSites = [
   { name: "Metro Tower - Block A", issue: "5 days delayed", severity: "high", siteId: "site-001" },
   { name: "DLF Cyber City Phase 3", issue: "Pending approvals", severity: "medium", siteId: "site-005" },
   { name: "Mindspace IT Park", issue: "Vendor confirmation required", severity: "low", siteId: "site-003" },
@@ -32,16 +34,39 @@ const alertSites = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { data, loading } = useAppData();
+
+  // Use live data if available, else hardcoded fallback
+  const activeSites = data?.dashboard?.activeSites ?? 24;
+  const totalAcs = data?.dashboard?.totalAcsUnits ?? 342;
+  const openTickets = data?.dashboard?.openTickets ?? 7;
+  const monthlyRevenue = data?.dashboard?.monthlyRevenue ?? 4250000;
+
+  const formatRevenue = (val: number) => {
+    if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
+    if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
+    return `₹${val.toLocaleString("en-IN")}`;
+  };
+
+  // Build alert sites from live data (sites with delays) or fallback
+  const alertSites = data?.sites
+    ? data.sites
+        .filter(s => s.hasDelay)
+        .slice(0, 5)
+        .map(s => ({ name: s.name, issue: "Delayed", severity: "high" as const, siteId: String(s.id) }))
+    : fallbackAlertSites;
+
+  const recentActivity = fallbackRecentActivity;
 
   return (
     <div className="p-6 animate-fade-in">
       <div className="mb-8"><h1 className="text-2xl font-semibold text-foreground mb-1">Dashboard</h1><p className="text-sm text-muted-foreground">Operations overview • Last updated: Just now</p></div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MetricCard title="Active Sites" value="24" change="+3 this month" changeType="positive" icon={<MapPin className="w-5 h-5 text-primary" />} onClick={() => navigate("/projects")} />
-        <MetricCard title="Total ACS Units" value="342" change="+18 installed" changeType="positive" icon={<Box className="w-5 h-5 text-primary" />} onClick={() => navigate("/assets")} />
-        <MetricCard title="Open Tickets" value="7" change="2 critical" changeType="negative" icon={<AlertTriangle className="w-5 h-5 text-primary" />} onClick={() => navigate("/maintenance")} />
-        <MetricCard title="Monthly Revenue" value="₹42.5L" change="+12.5%" changeType="positive" icon={<DollarSign className="w-5 h-5 text-primary" />} onClick={() => navigate("/finance")} />
+        <MetricCard title="Active Sites" value={activeSites} change={data ? `${activeSites} total` : "+3 this month"} changeType="positive" icon={<MapPin className="w-5 h-5 text-primary" />} onClick={() => navigate("/projects")} />
+        <MetricCard title="Total ACS Units" value={totalAcs} change={data ? `${totalAcs} total` : "+18 installed"} changeType="positive" icon={<Box className="w-5 h-5 text-primary" />} onClick={() => navigate("/assets")} />
+        <MetricCard title="Open Tickets" value={openTickets} change={data ? `${openTickets} open` : "2 critical"} changeType="negative" icon={<AlertTriangle className="w-5 h-5 text-primary" />} onClick={() => navigate("/maintenance")} />
+        <MetricCard title="Monthly Revenue" value={formatRevenue(monthlyRevenue)} change={data ? "Live" : "+12.5%"} changeType="positive" icon={<DollarSign className="w-5 h-5 text-primary" />} onClick={() => navigate("/finance")} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

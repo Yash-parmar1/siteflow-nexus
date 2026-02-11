@@ -35,6 +35,8 @@ const subprojectSchema = z.object({
   tenureMonths: z.number().min(12, "Minimum tenure is 12 months").max(120),
   plannedAcsCount: z.number().min(1, "At least one AC").max(10, "Max 10 ACs per site"),
   installationChargeable: z.boolean(),
+  stabilizerEnabled: z.boolean(),
+
   installationCharge: z.number().optional(),
   maintenanceIncluded: z.boolean(),
   maintenanceCharge: z.number().optional(),
@@ -122,6 +124,7 @@ export function AddSubprojectDialog({
       installationCharge: 25000,
       maintenanceIncluded: true,
       maintenanceCharge: 2000,
+      stabilizerEnabled: true,
     },
   });
 
@@ -336,6 +339,25 @@ export function AddSubprojectDialog({
                     />
                   )}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FormField
+                    control={form.control}
+                    name="stabilizerEnabled"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <FormLabel className="!mt-0 cursor-pointer">Stabilizer Enabled</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+
               </div>
             </div>
 
