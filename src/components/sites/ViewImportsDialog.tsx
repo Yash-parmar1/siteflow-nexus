@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, Eye, FileText, Inbox, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import UploadResultDialog from "./UploadResultDialog";
 import { toast } from "sonner";
@@ -24,7 +27,7 @@ export default function ViewImportsDialog({ open, onOpenChange, projectId, subpr
     setLoading(true);
     api.get(`/projects/${projectId}/subprojects/${subprojectId}/uploads`).then((res) => {
       setSessions(res.data);
-    }).catch((e) => {
+    }).catch(() => {
       toast.error("Failed to list imports");
     }).finally(() => setLoading(false));
   }, [open]);
@@ -37,31 +40,66 @@ export default function ViewImportsDialog({ open, onOpenChange, projectId, subpr
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[720px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[640px] max-h-[80vh] bg-background border-border">
           <DialogHeader>
-            <DialogTitle>Imports for Subproject</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Import History
+            </DialogTitle>
+            <DialogDescription>
+              View all file imports for this subproject.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            {loading ? (
-              <div>Loading...</div>
-            ) : sessions.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No imports found for this subproject.</div>
-            ) : (
-              sessions.map((s:any) => (
-                <div key={s.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{s.originalFilename}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(s.uploadTimestamp).toLocaleString()}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => openResult(s.id)} variant="outline">View Result</Button>
-                    <a className="btn" href={`/api/projects/${projectId}/subprojects/${subprojectId}/uploads/${s.id}/download`} target="_blank">Download</a>
-                  </div>
+          <ScrollArea className="max-h-[400px] pr-2">
+            <div className="space-y-2 py-2">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
                 </div>
-              ))
-            )}
-          </div>
+              ) : sessions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="w-12 h-12 mb-3 rounded-full bg-muted flex items-center justify-center">
+                    <Inbox className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">No imports found for this subproject.</p>
+                </div>
+              ) : (
+                sessions.map((s: any) => (
+                  <div key={s.id} className="p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{s.originalFilename}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(s.uploadTimestamp).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button onClick={() => openResult(s.id)} variant="outline" size="sm" className="gap-1.5 text-xs h-7">
+                          <Eye className="w-3.5 h-3.5" />
+                          View
+                        </Button>
+                        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
+                          <a href={`/api/projects/${projectId}/subprojects/${subprojectId}/uploads/${s.id}/download`} target="_blank">
+                            <Download className="w-3.5 h-3.5" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button size="sm" onClick={() => onOpenChange(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
