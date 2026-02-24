@@ -55,7 +55,7 @@ import { useAppData } from "@/context/AppDataContext";
 
 interface RowResult {
   rowNumber: number;
-  siteCode: string | null; // serialNumber in context
+  siteCode: string | null;
   status: "OK" | "WARN" | "ERROR";
   message: string;
   isError: boolean;
@@ -83,42 +83,51 @@ interface EditableRow extends RowResult {
   editedData: Record<string, string>;
 }
 
-// ── Column labels for display ──────────────────────────────────
+// ── File type definitions ──────────────────────────────────────
 
-const COLUMN_LABELS: Record<string, string> = {
-  "Column_0": "Sub Order ID",
-  "Column_1": "Item Order ID",
-  "Column_2": "Serial Number",
-  "Column_3": "Customer Name",
-  "Column_4": "Mobile",
-  "Column_5": "Product",
-  "Column_6": "Brand",
-  "Column_7": "Category",
-  "Column_8": "Size",
-  "Column_9": "Model Number",
-  "Column_10": "City",
-  "Column_11": "State",
-  "Column_12": "Upcountry",
-  "Column_13": "Booking ID",
-  "Column_14": "Around Item ID",
-  "Column_15": "Booking Date",
-  "Column_16": "Closed Date",
-  "Column_17": "Sf Closed Date",
-  "Column_18": "Status",
-  "Column_19": "Spare Involved",
-  "Column_20": "OTP Verified",
-  "Column_21": "Rating",
-  "Column_22": "Serial Number Image",
-  // Dynamically handled beyond 22
-};
+type FinancialFileType =
+  | "installation-materials"
+  | "installation-invoices"
+  | "rent-bills"
+  | "final-invoice";
 
-function getColumnLabel(key: string): string {
-  return COLUMN_LABELS[key] || key;
+interface FileTypeOption {
+  value: FinancialFileType;
+  label: string;
+  description: string;
+  endpoint: string;
 }
+
+const FILE_TYPES: FileTypeOption[] = [
+  {
+    value: "installation-materials",
+    label: "Installation Materials",
+    description: "Extra material per site data (copper pipe, ODU stand, wiring, etc.)",
+    endpoint: "installation-materials",
+  },
+  {
+    value: "installation-invoices",
+    label: "Installation Invoices",
+    description: "Invoices per site with cost breakdowns",
+    endpoint: "installation-invoices",
+  },
+  {
+    value: "rent-bills",
+    label: "Monthly Rent Bills",
+    description: "Monthly billing with CGST/SGST and payment status",
+    endpoint: "rent-bills",
+  },
+  {
+    value: "final-invoice",
+    label: "Final Invoice Summary",
+    description: "Invoice summary with line items, GST, and grand total",
+    endpoint: "final-invoice",
+  },
+];
 
 // ── Component Props ────────────────────────────────────────────
 
-interface ImportInstallationsDialogProps {
+interface ImportFinancialDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -127,16 +136,17 @@ type DialogStep = "upload" | "summary";
 
 // ── Main Component ─────────────────────────────────────────────
 
-export function ImportInstallationsDialog({
+export function ImportFinancialDialog({
   open,
   onOpenChange,
-}: ImportInstallationsDialogProps) {
+}: ImportFinancialDialogProps) {
   const { refresh } = useAppData();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // State
   const [step, setStep] = useState<DialogStep>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileType, setFileType] = useState<FinancialFileType>("installation-materials");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -221,7 +231,11 @@ export function ImportInstallationsDialog({
 
       setUploadProgress(30);
 
-      const resp = await api.post<UploadResponse>("/installations/import", formData, {
+      const selectedType = FILE_TYPES.find((ft) => ft.value === fileType)!;
+      // Use fixed project/subproject IDs — adjust as needed for your routing
+      const endpoint = `/projects/1/subprojects/1/financial/${selectedType.endpoint}`;
+
+      const resp = await api.post<UploadResponse>(endpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
@@ -257,7 +271,7 @@ export function ImportInstallationsDialog({
         );
       }
     } catch (err: any) {
-      console.error("[ImportInstallations] upload failed", err);
+      console.error("[ImportFinancial] upload failed", err);
       const msg =
         err?.response?.data?.error || err?.message || "Upload failed";
       toast.error(msg);
@@ -315,7 +329,7 @@ export function ImportInstallationsDialog({
   const handleDone = async () => {
     await refresh();
     handleClose();
-    toast.success("Installation data refreshed");
+    toast.success("Financial data refreshed");
   };
 
   // ── Render helpers ──────────────────────────────────────────
@@ -351,6 +365,8 @@ export function ImportInstallationsDialog({
     return `${(bytes / 1048576).toFixed(1)} MB`;
   };
 
+  const selectedTypeInfo = FILE_TYPES.find((ft) => ft.value === fileType)!;
+
   // ── Render ──────────────────────────────────────────────────
 
   return (
@@ -368,25 +384,51 @@ export function ImportInstallationsDialog({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-primary" />
-                Import Installations
+                Import Financial Data
               </DialogTitle>
               <DialogDescription>
-                Upload a CSV or Excel file with installation records. The file will
-                be parsed and matched against existing assets by serial number.
+                Upload a CSV or Excel file with financial records. Select the file
+                type below to ensure correct parsing.
               </DialogDescription>
             </DialogHeader>
 
             <div className="py-4 space-y-4">
+              {/* File type selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  File Type
+                </label>
+                <Select
+                  value={fileType}
+                  onValueChange={(val) => setFileType(val as FinancialFileType)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select file type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    {FILE_TYPES.map((ft) => (
+                      <SelectItem key={ft.value} value={ft.value}>
+                        {ft.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {selectedTypeInfo.description}
+                </p>
+              </div>
+
               {/* Drop zone */}
               <div
                 className={`
                   border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
                   transition-all duration-200
-                  ${dragActive
-                    ? "border-primary bg-primary/5"
-                    : selectedFile
-                    ? "border-[hsl(var(--status-success))] bg-[hsl(var(--status-success)/0.05)]"
-                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/30"
+                  ${
+                    dragActive
+                      ? "border-primary bg-primary/5"
+                      : selectedFile
+                      ? "border-[hsl(var(--status-success))] bg-[hsl(var(--status-success)/0.05)]"
+                      : "border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/30"
                   }
                 `}
                 onClick={() => fileInputRef.current?.click()}
@@ -455,9 +497,14 @@ export function ImportInstallationsDialog({
                   <FileText className="w-4 h-4" /> Expected File Format
                 </p>
                 <p className="text-muted-foreground">
-                  Columns: Serial Number, Customer Name, Mobile, Size, Model Number,
-                  Booking ID, Around Item ID, Booking Date, Closed Date, Status,
-                  Spare Involved, OTP Verified, Rating, Serial Image URL, Evidence URLs…
+                  {fileType === "installation-materials" &&
+                    "Columns: Booking ID, Brand Sub Order ID, AC Details, Customer Name, State, City, Copper Pipe(Meter), ODU Stand(Qty), 4 Core wire, 3 Core wire, Drain Pipe, Ladder Rent, Iron Angle, etc."}
+                  {fileType === "installation-invoices" &&
+                    "Columns: Booking ID, AC Details, Customer Name, State, City, Installation & Demo, Copper Pipe, ODU Stand, 4 Core wire, 3 Core wire, Drain Pipe, Total Basic, etc."}
+                  {fileType === "rent-bills" &&
+                    "Columns: MONTHS, BILLING DATE, AMOUNT, CGST, SGST, TOTAL, BILLED, PAYMET STATUS"}
+                  {fileType === "final-invoice" &&
+                    "Columns: S.No., Particulars, Count/No. Of Calls, Basic Charges, GST, Total Amount"}
                 </p>
               </div>
 
@@ -468,16 +515,47 @@ export function ImportInstallationsDialog({
                 size="sm"
                 className="gap-2 w-full"
                 onClick={() => {
-                  const csvContent = [
-                    'Sub_Order_ID,Item Order ID,Serial Number,Customer Name,Mobile,Product,Brand,Category,Size,Model Number,City,State,Upcountry,Booking ID,247Around Item ID,Booking Date,Closed Date,Sf Closed Date,Status,Spare Involved,Otp Verified,Rating,Serial Number Image',
-                    '04112514,,AAAPF6007110JR8ML4M0,Sujit Mahapatra,8457999911,Air Conditioner,Nexgen,AC-SPLIT,1 Ton,HSU14E-TXG5BN-INV:AC,nayagarh,Odisha,NO,YK-17323982511042,2879802,01-Dec-25,02-Dec-25,01-Dec-25,Installation & Demo (Free),No,Yes,,',
-                    '04112517,,AAAPF6007110JR8MA2DT,John Doe,9876543210,Air Conditioner,Nexgen,AC-SPLIT,1.5 Ton,HSU18E-TXG5BN-INV:AC,bhadrak,Odisha,NO,YK-17323982511045,2879805,02-Dec-25,02-Dec-25,02-Dec-25,Installation & Demo (Free),No,Yes,,',
-                  ].join('\n');
-                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const samples: Record<FinancialFileType, { content: string; name: string }> = {
+                    "installation-materials": {
+                      content: [
+                        'Booking ID,Brand Sub Order ID,AC Details,Customer Name,State,City,Booking Address,Copper Pipe(Meter),ODU Stand(Qty),4 Core wire(Meter),3 Core wire(Meter),Drain Pipe(Meter),Ladder Rent,Iron Angle,Iron Stand (Cage) for Outdoor,Gas Top up,Core cutting,Sedal,3 Pin Top,Casing Patti,hanging outdoor stand',
+                        'YK-173239825110410,4112535,AC- 1,Sujit Mahapatra,Odisha,nayagarh,"Adj. To Bus Stop, At-Gania",12,2,14,,10,,,,,,,,,',
+                        'YK-173239825110411,4112536,AC- 2,Jane Doe,Maharashtra,Mumbai,"Shop 5, Andheri East",8,1,10,5,6,200,,,,,,,,',
+                      ].join('\n'),
+                      name: 'sample_installation_materials.csv',
+                    },
+                    "installation-invoices": {
+                      content: [
+                        'Booking ID,AC Details,Customer Name,State,City,Booking Address,Installation & Demo,Copper Pipe(Meter),ODU Stand(Qty),4 Core wire(Meter),3 Core wire(Meter),Drain Pipe(Meter),Ladder Rent,Iron Angle,Iron Stand (Cage) for Outdoor,Gas Top up,Core cutting,Sedal,3 Pin Top,Casing Patti,hanging outdoor stand,Total Basic',
+                        'YK-173239825110410,AC- 1,Sujit Mahapatra,Odisha,nayagarh,"Adj. To Bus Stop",1200,850,450,110,90,65,,,,,,,,,5710',
+                        'YK-173239825110411,AC- 2,Jane Doe,Maharashtra,Mumbai,"Shop 5, Andheri",1200,680,450,88,72,52,200,,,,,,,,4942',
+                      ].join('\n'),
+                      name: 'sample_installation_invoices.csv',
+                    },
+                    "rent-bills": {
+                      content: [
+                        'MONTHS,BILLING DATE,AMOUNT,CGST,SGST,TOTAL,BILLED,PAYMET STATUS',
+                        'Aug2025,1-9-2025,1116,100.44,100.44,1316.88,Yes,Paid',
+                        'Sep2025,1-10-2025,3460,311.4,311.4,4082.8,Yes,Pending',
+                      ].join('\n'),
+                      name: 'sample_monthly_rent_bills.csv',
+                    },
+                    "final-invoice": {
+                      content: [
+                        'S.No.,Particulars,"Count/No. Of Calls (Per Product)",Basic Charges,GST,Total Amount',
+                        '1,Installation & Demo,97,116400,20952,137352',
+                        '2,Copper Pipe (Per Meter),404,343145,61766,404911',
+                        '3,ODU Stand,75,33750,6075,39825',
+                      ].join('\n'),
+                      name: 'sample_final_invoice.csv',
+                    },
+                  };
+                  const sample = samples[fileType];
+                  const blob = new Blob([sample.content], { type: 'text/csv;charset=utf-8;' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
-                  link.download = 'sample_installation_data.csv';
+                  link.download = sample.name;
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
@@ -485,7 +563,7 @@ export function ImportInstallationsDialog({
                 }}
               >
                 <Download className="w-4 h-4" />
-                Download Sample Installation File
+                Download Sample {selectedTypeInfo.label} File
               </Button>
             </div>
 
@@ -519,7 +597,7 @@ export function ImportInstallationsDialog({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-primary" />
-                Import Summary
+                Import Summary — {selectedTypeInfo.label}
               </DialogTitle>
               <DialogDescription>
                 Review the import results. You can inspect row details and errors below.
@@ -559,7 +637,7 @@ export function ImportInstallationsDialog({
                       <TableRow className="bg-secondary/50">
                         <TableHead className="w-[60px]">Row</TableHead>
                         <TableHead className="w-[110px]">Status</TableHead>
-                        <TableHead className="w-[140px]">Serial No.</TableHead>
+                        <TableHead className="w-[160px]">Reference</TableHead>
                         <TableHead>Message</TableHead>
                         <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
@@ -706,7 +784,7 @@ function RowBlock({
                 {Object.entries(row.editedData).map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">
-                      {getColumnLabel(key)}
+                      {key}
                     </label>
                     <Input
                       value={value}

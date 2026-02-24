@@ -1,308 +1,232 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { SiteHeader } from "@/components/sites/SiteHeader";
 import { SiteTimeline } from "@/components/sites/SiteTimeline";
 import { ACSContractCard } from "@/components/sites/ACSContractCard";
 import { InstallationTracking } from "@/components/sites/InstallationTracking";
 import { MaintenanceTickets } from "@/components/sites/MaintenanceTickets";
 import { FinanceSnapshot } from "@/components/sites/FinanceSnapshot";
-import { Info } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Info, Package, X, ImageIcon } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 
-// Fallback mock data for site details with project binding
-const getFallbackSiteData = (siteId: string) => ({
-  id: siteId,
-  name: "Metro Tower - Block A",
-  location: "Mumbai, Maharashtra",
-  stage: "WIP",
-  progress: 65,
-  acsPlanned: 12,
-  acsInstalled: 8,
-  hasDelay: true,
-  delayDays: 5,
-  // Project binding (immutable)
-  projectId: "proj-001",
-  projectName: "Dava India",
-  subprojectId: "subproj-002",
-  subprojectName: "Mumbai",
-  configVersion: "1.0",
-  configuredRent: 15000,
-  configuredTenure: 36,
-  installationIncluded: false,
-  maintenanceIncluded: true,
-});
+/** Derive timeline events dynamically from site date fields and currentStage. */
+function buildTimelineEvents(site: any) {
+  // Stage order: Started → WTS → WIP → TIS → Installed → Live
+  const stageOrder = ["Started", "WTS", "WIP", "TIS", "Installed", "Live"];
+  // Map date fields to stages
+  const stageDateMap: Record<string, { dateField: string | null; notes?: string }> = {
+    Started: { dateField: "createdAt", notes: "Project started and site registered." },
+    WTS: { dateField: "stabilizerOrderDate", notes: "Stabilizer ordered / work to start." },
+    WIP: { dateField: "acOrderedDate", notes: "AC ordered, work in progress." },
+    TIS: { dateField: "installationScheduled", notes: "Installation scheduled for testing." },
+    Installed: { dateField: "installationDone", notes: "Installation completed." },
+    Live: { dateField: "actualLiveDate", notes: "Site is live and operational." },
+  };
 
-const fallbackTimelineEvents = [
-  {
-    id: "1",
-    stage: "Started",
-    status: "completed" as const,
-    date: "Oct 15, 2023",
-    user: "Rajesh Kumar",
-    notes: "Project kickoff completed. Initial site survey done.",
-  },
-  {
-    id: "2",
-    stage: "WTS",
-    status: "completed" as const,
-    date: "Nov 01, 2023",
-    user: "Priya Sharma",
-    hasAttachments: true,
-  },
-  {
-    id: "3",
-    stage: "WIP",
-    status: "current" as const,
-    date: "Dec 10, 2023 - Present",
-    user: "Installation Team A",
-    notes: "8 of 12 units installed. Awaiting shipment for remaining 4 units.",
-  },
-  {
-    id: "4",
-    stage: "TIS",
-    status: "upcoming" as const,
-  },
-  {
-    id: "5",
-    stage: "Installed",
-    status: "upcoming" as const,
-  },
-  {
-    id: "6",
-    stage: "Live",
-    status: "upcoming" as const,
-  },
-];
+  // Determine current stage index from the site's currentStage field
+  const currentStageRaw = (site.currentStage ?? site.stage ?? "").toUpperCase();
+  const stageNameMap: Record<string, number> = {
+    STARTED: 0, PLANNING: 0,
+    WTS: 1, WORK_TO_START: 1,
+    WIP: 2, WORK_IN_PROGRESS: 2,
+    TIS: 3, TESTING: 3,
+    INSTALLED: 4, INSTALLATION_DONE: 4,
+    LIVE: 5, ACTIVE: 5,
+  };
+  const currentIdx = stageNameMap[currentStageRaw] ?? 0;
 
-// Fallback ACS units with individual tenure tracking
-const fallbackACSUnits = [
-  {
-    id: "acs-001",
-    serialNumber: "ACS-MT-001",
-    model: "ProCool 5000X",
-    location: "Floor 1, Zone A",
-    status: "operational" as const,
-    installDate: "Dec 15, 2023",
-    activationDate: "Dec 20, 2023",
-    tenureMonths: 36,
-    rentStartDate: "Dec 20, 2023",
-    rentEndDate: "Dec 19, 2026",
-    contractStatus: "active" as const,
-    daysRemaining: 1054,
-    monthlyRent: 15000,
-    lastMaintenance: "Jan 10, 2024",
-    configurationVersion: "1.0",
-  },
-  {
-    id: "acs-002",
-    serialNumber: "ACS-MT-002",
-    model: "ProCool 5000X",
-    location: "Floor 1, Zone B",
-    status: "operational" as const,
-    installDate: "Dec 16, 2023",
-    activationDate: "Dec 22, 2023",
-    tenureMonths: 36,
-    rentStartDate: "Dec 22, 2023",
-    rentEndDate: "Dec 21, 2026",
-    contractStatus: "active" as const,
-    daysRemaining: 1056,
-    monthlyRent: 15000,
-    configurationVersion: "1.0",
-  },
-  {
-    id: "acs-003",
-    serialNumber: "ACS-MT-003",
-    model: "ProCool 3000",
-    location: "Floor 2, Zone A",
-    status: "maintenance" as const,
-    installDate: "Dec 18, 2023",
-    activationDate: "Jan 05, 2024",
-    tenureMonths: 36,
-    rentStartDate: "Jan 05, 2024",
-    rentEndDate: "Jan 04, 2027",
-    contractStatus: "active" as const,
-    daysRemaining: 1100,
-    monthlyRent: 15000,
-    hasIssue: true,
-    configurationVersion: "1.0",
-  },
-  {
-    id: "acs-004",
-    serialNumber: "ACS-MT-004",
-    model: "ProCool 5000X",
-    location: "Floor 2, Zone B",
-    status: "pending" as const,
-    tenureMonths: 36,
-    configurationVersion: "1.0",
-  },
-  {
-    id: "acs-005",
-    serialNumber: "ACS-MT-005",
-    model: "ProCool 5000X",
-    location: "Floor 3, Zone A",
-    status: "pending" as const,
-    tenureMonths: 36,
-    configurationVersion: "1.0",
-  },
-];
+  const fmt = (d: string | null) => {
+    if (!d) return undefined;
+    try {
+      return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch { return undefined; }
+  };
 
-const fallbackInstallations = [
-  {
-    id: "inst-001",
-    docketId: "DOC-2024-0125",
-    shipmentStatus: "in-transit" as const,
-    eta: "Jan 28, 2024",
-    installer: "Team Alpha",
-    unitsCount: 4,
-    hasEvidence: false,
-  },
-  {
-    id: "inst-002",
-    docketId: "DOC-2024-0089",
-    shipmentStatus: "installed" as const,
-    installer: "Team Beta",
-    unitsCount: 4,
-    hasEvidence: true,
-  },
-  {
-    id: "inst-003",
-    docketId: "DOC-2024-0067",
-    shipmentStatus: "installed" as const,
-    installer: "Team Alpha",
-    unitsCount: 4,
-    hasEvidence: true,
-  },
-];
+  return stageOrder.map((stage, idx) => {
+    const cfg = stageDateMap[stage];
+    const dateVal = cfg.dateField ? (site as any)[cfg.dateField] : null;
+    let status: "completed" | "current" | "upcoming";
+    if (idx < currentIdx) status = "completed";
+    else if (idx === currentIdx) status = "current";
+    else status = "upcoming";
 
-const fallbackTickets = [
-  {
-    id: "tkt-001",
-    title: "Cooling efficiency below threshold",
-    priority: "high" as const,
-    status: "in-progress" as const,
-    assignee: "Amit Verma",
-    createdAt: "Jan 20, 2024",
-    acsUnit: "ACS-MT-003",
-  },
-  {
-    id: "tkt-002",
-    title: "Unusual noise from compressor",
-    priority: "medium" as const,
-    status: "open" as const,
-    assignee: "Suresh Patel",
-    createdAt: "Jan 22, 2024",
-    acsUnit: "ACS-MT-001",
-  },
-];
-
-const fallbackFinanceData = {
-  rentStartDate: "Dec 20, 2023",
-  monthlyRent: 45000, // 3 active ACS x 15000
-  totalRevenue: 90000,
-  totalCosts: 65000,
-  netProfit: 25000,
-  profitMargin: 27.8,
-};
+    return {
+      id: String(idx + 1),
+      stage,
+      status,
+      date: fmt(dateVal),
+      notes: status !== "upcoming" ? cfg.notes : undefined,
+    };
+  });
+}
 
 export default function SiteCommandCenter() {
   const { siteId } = useParams();
   const { data: appData } = useAppData();
   const navigate = useNavigate();
 
-  // Build live site data from appData, fallback to hardcoded
+  // Build live site data from appData
   const liveSite = appData?.sites?.find((s) => String(s.id) === siteId);
-  const site = liveSite
-    ? {
-        id: String(liveSite.id),
-        name: liveSite.name,
-        location: liveSite.location ?? "",
-        stage: liveSite.stage ?? "WIP",
-        progress: liveSite.progress ?? 0,
-        acsPlanned: liveSite.acsPlanned ?? 0,
-        acsInstalled: liveSite.acsInstalled ?? 0,
-        hasDelay: liveSite.hasDelay ?? false,
-        delayDays: liveSite.delayDays ?? 0,
-        projectId: liveSite.projectId ? String(liveSite.projectId) : "",
-        projectName: liveSite.projectName ?? "",
-        subprojectId: liveSite.subprojectId ? String(liveSite.subprojectId) : "",
-        subprojectName: liveSite.subprojectName ?? "",
-        configVersion: "1.0",
-        configuredRent: liveSite.configuredRent ?? 0,
-        configuredTenure: liveSite.configuredTenure ?? 36,
-        installationIncluded: false,
-        maintenanceIncluded: true,
-      }
-    : getFallbackSiteData(siteId || "");
+
+  // Parse location from addressJson
+  let siteLocation = "";
+  if (liveSite?.addressJson) {
+    try {
+      const addr = JSON.parse(liveSite.addressJson);
+      siteLocation = [addr.city, addr.state].filter(Boolean).join(", ");
+    } catch { /* ignore */ }
+  }
+
+  if (!liveSite) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Package className="w-16 h-16 text-muted-foreground/30 mx-auto" />
+          <h2 className="text-xl font-semibold">Site Not Found</h2>
+          <p className="text-muted-foreground">The site with ID "{siteId}" could not be found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const site = {
+    id: String(liveSite.id),
+    name: liveSite.name,
+    location: siteLocation || liveSite.location || "",
+    stage: liveSite.currentStage ?? liveSite.stage ?? "PLANNING",
+    progress: liveSite.progress ?? 0,
+    acsPlanned: liveSite.plannedAcsCount ?? liveSite.acsPlanned ?? 0,
+    acsInstalled: liveSite.acsInstalled ?? 0,
+    hasDelay: liveSite.hasDelay ?? false,
+    delayDays: liveSite.delayDays ?? 0,
+    projectId: liveSite.projectId ? String(liveSite.projectId) : "",
+    projectName: liveSite.projectName ?? "",
+    subprojectId: liveSite.subprojectId ? String(liveSite.subprojectId) : "",
+    subprojectName: liveSite.subprojectName ?? "",
+    configVersion: liveSite.configurationId ? `v${liveSite.configurationId}` : "-",
+    configuredRent: liveSite.configuredRent ?? 0,
+    configuredTenure: liveSite.configuredTenure ?? 0,
+    installationIncluded: false,
+    maintenanceIncluded: true,
+  };
 
   // Build live ACS units from assets filtered by site
-  const siteAssets = appData?.assets?.filter((a) => String(a.siteId) === siteId);
-  const liveACSUnits = siteAssets?.length
-    ? siteAssets.map((a, idx) => ({
-        id: String(a.id ?? idx),
-        serialNumber: a.serialNumber ?? `ACS-${idx + 1}`,
-        model: a.model ?? "N/A",
-        location: a.locationInSite ?? "",
-        status: (a.status === "ACTIVE" ? "operational" : a.status === "MAINTENANCE" ? "maintenance" : "pending") as "operational" | "maintenance" | "pending",
-        installDate: undefined as string | undefined,
-        activationDate: undefined as string | undefined,
-        tenureMonths: 36,
-        rentStartDate: undefined as string | undefined,
-        rentEndDate: undefined as string | undefined,
-        contractStatus: (a.status === "ACTIVE" ? "active" : "pending") as "active" | "pending",
-        daysRemaining: undefined as number | undefined,
-        monthlyRent: a.monthlyRent ?? 0,
-        configurationVersion: "1.0",
-      }))
-    : null;
-  const acsUnits = liveACSUnits ?? fallbackACSUnits;
+  const siteAssets = appData?.assets?.filter((a) => String(a.siteId) === siteId) ?? [];
+  const siteTenure = liveSite.configuredTenure ?? 0;
+  const acsUnits = siteAssets.map((a, idx) => {
+    // Find completed installation for this asset
+    const inst = appData?.installations?.find(
+      (i) => i.acAssetId === (a.id ?? 0) && i.installationDate
+    );
+    const installDate = inst?.installationDate ?? undefined;
+    // Compute rent end date from install date + site tenure
+    let rentEndDate: string | undefined;
+    let daysRemaining: number | undefined;
+    if (installDate && siteTenure > 0) {
+      const d = new Date(installDate);
+      d.setMonth(d.getMonth() + siteTenure);
+      rentEndDate = d.toISOString().split("T")[0];
+      daysRemaining = Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86400000));
+    }
+    return {
+      id: String(a.id ?? idx),
+      serialNumber: a.serialNumber ?? `ACS-${idx + 1}`,
+      model: a.model ?? "N/A",
+      location: a.locationInSite ?? "",
+      status: (a.status === "ACTIVE" ? "operational" : a.status === "MAINTENANCE" ? "maintenance" : "pending") as "operational" | "maintenance" | "pending",
+      installDate,
+      activationDate: installDate,
+      tenureMonths: siteTenure,
+      rentStartDate: installDate,
+      rentEndDate,
+      contractStatus: (a.status === "ACTIVE" ? "active" : "not-started") as "active" | "not-started",
+      daysRemaining,
+      monthlyRent: a.monthlyRent ?? 0,
+      configurationVersion: liveSite.configurationId ? `v${liveSite.configurationId}` : "-",
+      isIndoor: a.indoorAc,
+    };
+  });
 
   // Build live tickets from maintenance tickets filtered by site
-  const siteTickets = appData?.maintenanceTickets?.filter((t) => String(t.siteId) === siteId);
+  const siteTickets = appData?.maintenanceTickets?.filter((t) => String(t.siteId) === siteId) ?? [];
   const statusMap: Record<string, string> = { RAISED: "open", INSPECTED: "in-progress", QUOTED: "in-progress", APPROVED: "in-progress", REPAIRED: "resolved", CLOSED: "resolved" };
   const priorityMap: Record<string, string> = { LOW: "low", MEDIUM: "medium", HIGH: "high", CRITICAL: "high" };
-  const liveTickets = siteTickets?.length
-    ? siteTickets.map((t, idx) => ({
-        id: `tkt-${String(t.id ?? idx + 1).padStart(3, "0")}`,
-        title: t.title ?? "Untitled",
-        priority: (priorityMap[t.priority] ?? "medium") as "high" | "medium" | "low",
-        status: (statusMap[t.status] ?? "open") as "open" | "in-progress" | "resolved",
-        assignee: t.assignedTo ?? "-",
-        createdAt: t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
-        acsUnit: t.acAssetSerial ?? "N/A",
-      }))
-    : null;
-  const tickets = liveTickets ?? fallbackTickets;
+  const tickets = siteTickets.map((t, idx) => ({
+    id: `tkt-${String(t.id ?? idx + 1).padStart(3, "0")}`,
+    title: t.title ?? "Untitled",
+    priority: (priorityMap[t.priority] ?? "medium") as "high" | "medium" | "low",
+    status: (statusMap[t.status] ?? "open") as "open" | "in-progress" | "resolved",
+    assignee: t.assignedTo ?? "-",
+    createdAt: t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+    acsUnit: t.acAssetSerial ?? "N/A",
+  }));
 
   // Build live installations filtered by site
-  const siteInstallations = appData?.installations?.filter((i) => String(i.siteId) === siteId);
+  const siteInstallations = appData?.installations?.filter((i) => String(i.siteId) === siteId) ?? [];
   const installShipmentMap: Record<string, string> = { PENDING: "pending", IN_TRANSIT: "in-transit", DELIVERED: "delivered", INSTALLED: "installed" };
-  const liveInstallations = siteInstallations?.length
-    ? siteInstallations.map((i, idx) => ({
-        id: `inst-${String(idx + 1).padStart(3, "0")}`,
-        docketId: i.bookingId ?? `DOC-${idx + 1}`,
-        shipmentStatus: (installShipmentMap[i.shipmentStatus] ?? "pending") as "pending" | "in-transit" | "delivered" | "installed",
-        eta: i.eta ?? undefined,
-        installer: (i as any).installer ?? "-",
-        unitsCount: (i as any).unitsCount ?? 1,
-        hasEvidence: false,
-      }))
-    : null;
-  const installations = liveInstallations ?? fallbackInstallations;
+  const installations = siteInstallations.map((i, idx) => ({
+    id: `inst-${String(idx + 1).padStart(3, "0")}`,
+    docketId: i.bookingId ?? `DOC-${idx + 1}`,
+    shipmentStatus: (installShipmentMap[i.shipmentStatus] ?? "pending") as "pending" | "in-transit" | "delivered" | "installed",
+    eta: i.eta ? new Date(i.eta).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : undefined,
+    installer: i.receiverName ?? "-",
+    unitsCount: 1,
+    hasEvidence: !!(i.evidenceImagesJson || i.serialNumberImageUrl),
+    serialNumberImageUrl: i.serialNumberImageUrl ?? null,
+    evidenceImagesJson: i.evidenceImagesJson ?? null,
+  }));
 
-  // Build live finance data
-  const liveFinanceData = appData?.finance
-    ? {
-        rentStartDate: site.configuredRent ? "Active" : "-",
-        monthlyRent: acsUnits.filter((u) => u.status === "operational").length * (site.configuredRent || 15000),
-        totalRevenue: appData.finance.monthlyRevenue ?? 0,
-        totalCosts: (appData.finance.totalMaintenanceCost ?? 0) + (appData.finance.totalInstallationCost ?? 0),
-        netProfit: appData.finance.netProfit ?? 0,
-        profitMargin: appData.finance.monthlyRevenue ? Math.round(((appData.finance.netProfit ?? 0) / appData.finance.monthlyRevenue) * 1000) / 10 : 0,
-      }
-    : null;
-  const financeData = liveFinanceData ?? fallbackFinanceData;
+  // Evidence dialog state
+  const [evidenceDialog, setEvidenceDialog] = useState<{
+    open: boolean;
+    title: string;
+    images: string[];
+    serialImg: string | null;
+  }>({ open: false, title: "", images: [], serialImg: null });
 
-  // Timeline events (kept as fallback - no backend source yet)
-  const timelineEvents = fallbackTimelineEvents;
+  const handleViewEvidence = (inst: (typeof installations)[0]) => {
+    const images: string[] = [];
+    if (inst.evidenceImagesJson) {
+      try {
+        const parsed = JSON.parse(inst.evidenceImagesJson);
+        if (Array.isArray(parsed)) images.push(...parsed);
+      } catch { /* ignore */ }
+    }
+    setEvidenceDialog({
+      open: true,
+      title: `Evidence — ${inst.docketId}`,
+      images,
+      serialImg: inst.serialNumberImageUrl,
+    });
+  };
+
+  // Build per-site finance data from financial transactions
+  const siteTransactions = appData?.financialTransactions?.filter((t) => String(t.siteId) === siteId) ?? [];
+  // Rent = base rent × number of operational outdoor ACs
+  const siteMonthlyRent = acsUnits.filter((u) => u.status === "operational" && !u.isIndoor).length * (site.configuredRent || 0);
+  const siteTotalRevenue = siteTransactions
+    .filter((t) => ["MONTHLY_RENT_BILL", "EXTRA_MATERIALS", "FINAL_INVOICE"].includes(t.transactionType))
+    .reduce((sum, t) => sum + (t.totalAmount ?? 0), 0);
+  const siteTotalCosts = siteTransactions
+    .filter((t) => ["INSTALLATION_INVOICE", "INSTALLATION_MATERIALS", "PAYMENT_RECEIVED", "ADJUSTMENT"].includes(t.transactionType))
+    .reduce((sum, t) => sum + (t.totalAmount ?? 0), 0)
+    + siteTickets.reduce((sum, t) => sum + (t.visitingCharge ?? 0), 0);
+  const siteNetProfit = siteTotalRevenue > 0 ? siteTotalRevenue - siteTotalCosts : siteMonthlyRent - siteTotalCosts;
+
+  const financeData = {
+    rentStartDate: liveSite.actualLiveDate
+      ? new Date(liveSite.actualLiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : siteMonthlyRent > 0 ? "Active" : undefined,
+    monthlyRent: siteMonthlyRent,
+    totalRevenue: siteTotalRevenue > 0 ? siteTotalRevenue : siteMonthlyRent,
+    totalCosts: siteTotalCosts,
+    netProfit: siteNetProfit,
+    profitMargin: siteTotalRevenue > 0 ? Math.round((siteNetProfit / siteTotalRevenue) * 1000) / 10 : siteMonthlyRent > 0 ? Math.round((siteNetProfit / siteMonthlyRent) * 1000) / 10 : 0,
+  };
+
+  // Derive timeline from real site data
+  const timelineEvents = buildTimelineEvents(liveSite);
 
   // Calculate aggregate contract stats
   const activeContracts = acsUnits.filter(u => u.contractStatus === "active").length;
@@ -370,7 +294,7 @@ export default function SiteCommandCenter() {
 
             {/* Two Column Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <InstallationTracking installations={installations} />
+              <InstallationTracking installations={installations} onViewEvidence={handleViewEvidence} />
               <MaintenanceTickets tickets={tickets} />
             </div>
 
@@ -379,6 +303,54 @@ export default function SiteCommandCenter() {
           </div>
         </div>
       </div>
+
+      {/* Evidence Dialog */}
+      <Dialog open={evidenceDialog.open} onOpenChange={(o) => setEvidenceDialog((prev) => ({ ...prev, open: o }))}>
+        <DialogContent className="sm:max-w-[640px] max-h-[80vh] overflow-y-auto bg-background border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-primary" />
+              {evidenceDialog.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {evidenceDialog.serialImg && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Serial Number</p>
+                <img
+                  src={evidenceDialog.serialImg.startsWith("http") ? evidenceDialog.serialImg : `/api/files/${evidenceDialog.serialImg}`}
+                  alt="Serial Number"
+                  className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted/50"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              </div>
+            )}
+            {evidenceDialog.images.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Evidence Photos ({evidenceDialog.images.length})</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {evidenceDialog.images.map((imgUrl, idx) => (
+                    <img
+                      key={idx}
+                      src={imgUrl.startsWith("http") ? imgUrl : `/api/files/${imgUrl}`}
+                      alt={`Evidence ${idx + 1}`}
+                      className="w-full h-32 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => window.open(imgUrl.startsWith("http") ? imgUrl : `/api/files/${imgUrl}`, "_blank")}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {!evidenceDialog.serialImg && evidenceDialog.images.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <ImageIcon className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">No evidence images available for this installation.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

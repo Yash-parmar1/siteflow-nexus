@@ -13,15 +13,7 @@ import { Search, Plus, Wrench, AlertCircle, Clock, MapPin, MessageSquare, Paperc
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppData, type TicketData } from "@/context/AppDataContext";
 
-// Hardcoded fallback data (kept for reference)
-const fallbackTickets = [
-  { id: "TKT-001", title: "Compressor failure - Unit not cooling", description: "ACS unit in Floor 12 Zone A stopped cooling. Compressor making unusual noise.", site: "Metro Tower - Block A", siteId: "site-001", unit: "SN-2024-0002", status: "Open", priority: "Critical", assignee: { name: "Raj Kumar" }, createdAt: "Dec 24, 2024", updatedAt: "2 hours ago", comments: 4, attachments: 2 },
-  { id: "TKT-002", title: "Routine maintenance overdue", description: "Scheduled maintenance was missed. Needs immediate attention.", site: "Prestige Tech Park", siteId: "site-004", unit: "SN-2024-0005", status: "In Progress", priority: "High", assignee: { name: "Priya Singh" }, createdAt: "Dec 22, 2024", updatedAt: "5 hours ago", comments: 2, attachments: 0 },
-  { id: "TKT-003", title: "Filter replacement required", description: "Air quality monitoring indicates filter needs replacement.", site: "Phoenix Mall Expansion", siteId: "site-002", unit: "SN-2024-0003", status: "Open", priority: "Medium", assignee: { name: "Amit Patel" }, createdAt: "Dec 23, 2024", updatedAt: "1 day ago", comments: 1, attachments: 1 },
-  { id: "TKT-004", title: "Thermostat calibration issue", description: "Temperature readings inconsistent.", site: "Cyber Hub Tower 5", siteId: "site-003", unit: "SN-2024-0004", status: "Pending Parts", priority: "Medium", assignee: { name: "Raj Kumar" }, createdAt: "Dec 20, 2024", updatedAt: "3 days ago", comments: 6, attachments: 3 },
-  { id: "TKT-005", title: "Noise complaint - vibration issue", description: "Tenant reported excessive noise.", site: "Metro Tower - Block A", siteId: "site-001", unit: "SN-2024-0001", status: "Resolved", priority: "Low", assignee: { name: "Priya Singh" }, createdAt: "Dec 15, 2024", updatedAt: "Dec 20, 2024", comments: 8, attachments: 1 },
-  { id: "TKT-006", title: "Refrigerant leak detected", description: "Pressure drop indicates potential refrigerant leak.", site: "DLF Cyber City Phase 3", siteId: "site-005", unit: "SN-2024-0006", status: "In Progress", priority: "Critical", assignee: { name: "Amit Patel" }, createdAt: "Dec 25, 2024", updatedAt: "30 mins ago", comments: 3, attachments: 2 },
-];
+// Hardcoded fallback removed – all data comes from live API
 
 const statusConfig: Record<string, { color: string; bgColor: string }> = { Open: { color: "text-[hsl(var(--status-info))]", bgColor: "bg-[hsl(var(--status-info)/0.15)]" }, "In Progress": { color: "text-[hsl(var(--status-warning))]", bgColor: "bg-[hsl(var(--status-warning)/0.15)]" }, "Pending Parts": { color: "text-muted-foreground", bgColor: "bg-muted" }, Resolved: { color: "text-[hsl(var(--status-success))]", bgColor: "bg-[hsl(var(--status-success)/0.15)]" } };
 const priorityConfig: Record<string, { dot: string }> = { Critical: { dot: "bg-[hsl(var(--status-error))]" }, High: { dot: "bg-[hsl(var(--status-warning))]" }, Medium: { dot: "bg-[hsl(var(--status-info))]" }, Low: { dot: "bg-muted-foreground" } };
@@ -40,25 +32,21 @@ export default function Maintenance() {
   const statusMap: Record<string, string> = { RAISED: "Open", INSPECTED: "In Progress", QUOTED: "In Progress", APPROVED: "In Progress", REPAIRED: "Resolved", CLOSED: "Resolved" };
   const priorityMap: Record<string, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High", CRITICAL: "Critical" };
 
-  const liveTickets: typeof fallbackTickets | null = appData?.maintenanceTickets?.length
-    ? appData.maintenanceTickets.map((t: TicketData, idx: number) => ({
-        id: `TKT-${String(t.id ?? idx + 1).padStart(3, "0")}`,
-        title: t.title ?? "Untitled Ticket",
-        description: t.description ?? "",
-        site: t.siteName ?? "Unknown Site",
-        siteId: t.siteId ? String(t.siteId) : "site-000",
-        unit: t.acAssetSerial ?? "N/A",
-        status: statusMap[t.status] ?? "Open",
-        priority: priorityMap[t.priority] ?? "Medium",
-        assignee: { name: t.assignedTo ?? "-" },
-        createdAt: t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
-        updatedAt: t.updatedAt ? new Date(t.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
-        comments: 0,
-        attachments: 0,
-      }))
-    : null;
-
-  const tickets = liveTickets ?? fallbackTickets;
+  const tickets = (appData?.maintenanceTickets ?? []).map((t: TicketData, idx: number) => ({
+    id: `TKT-${String(t.id ?? idx + 1).padStart(3, "0")}`,
+    title: t.title ?? "Untitled Ticket",
+    description: t.description ?? "",
+    site: t.siteName ?? "Unknown Site",
+    siteId: t.siteId ? String(t.siteId) : "site-000",
+    unit: t.acAssetSerial ?? "N/A",
+    status: statusMap[t.status] ?? "Open",
+    priority: priorityMap[t.priority] ?? "Medium",
+    assignee: { name: t.assignedTo ?? "-" },
+    createdAt: t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+    updatedAt: t.updatedAt ? new Date(t.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+    comments: 0,
+    attachments: 0,
+  }));
 
   const filteredTickets = tickets.filter((ticket) => {
     const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) || ticket.site.toLowerCase().includes(searchQuery.toLowerCase()) || ticket.id.toLowerCase().includes(searchQuery.toLowerCase());

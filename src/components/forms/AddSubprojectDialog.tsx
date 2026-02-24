@@ -203,7 +203,7 @@ export function AddSubprojectDialog({
                     <FormItem>
                       <FormLabel className="flex items-center gap-1.5">
                         <IndianRupee className="w-3.5 h-3.5" />
-                        Base Monthly Rent
+                        Base Monthly Rent per asset 
                       </FormLabel>
                       <FormControl>
                         <Input 

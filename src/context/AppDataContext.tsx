@@ -74,6 +74,10 @@ export interface AssetData {
   firstMonthRent: number | null;
   siteId: number | null;
   siteName: string | null;
+  subprojectId: number | null;
+  subprojectName: string | null;
+  projectId: number | null;
+  projectName: string | null;
 }
 
 export interface InstallationData {
@@ -92,6 +96,8 @@ export interface InstallationData {
   receiverName: string | null;
   receiverNumber: string | null;
   remarks: string | null;
+  serialNumberImageUrl: string | null;
+  evidenceImagesJson: string | null;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -118,6 +124,32 @@ export interface FinanceSummary {
   totalMaintenanceCost: number;
   totalInstallationCost: number;
   netProfit: number;
+  collected?: number;
+  outstanding?: number;
+}
+
+export interface FinancialTransactionData {
+  id: number;
+  transactionType: string;
+  transactionRef: string;
+  siteId?: number;
+  siteName?: string;
+  billingPeriod?: string;
+  transactionDate: string;
+  dueDate?: string;
+  baseAmount: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  totalAmount: number;
+  paymentStatus: string;
+  paidAmount?: number;
+  paymentDate?: string;
+  paymentReference?: string;
+  paymentMode?: string;
+  invoiceNumber?: string;
+  daysOverdue?: number;
+  remarks?: string;
+  createdAt?: string;
 }
 
 export interface AppData {
@@ -127,6 +159,7 @@ export interface AppData {
   installations: InstallationData[];
   maintenanceTickets: TicketData[];
   finance: FinanceSummary;
+  financialTransactions: FinancialTransactionData[];
 }
 
 interface AppDataContextType {
@@ -146,6 +179,7 @@ const EMPTY_APP_DATA: AppData = {
   installations: [],
   maintenanceTickets: [],
   finance: { monthlyRevenue: 0, totalMaintenanceCost: 0, totalInstallationCost: 0, netProfit: 0 },
+  financialTransactions: [],
 };
 
 export const AppDataProvider = ({ children }: { children: ReactNode }) => {

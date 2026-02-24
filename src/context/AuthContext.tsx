@@ -24,6 +24,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('token'));
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
+  // when the provider is first rendered we may already have a token
+  // stored from a previous session; apply it to the axios instance
+  const existingToken = localStorage.getItem('token');
+  if (existingToken) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
+  }
+
   useEffect(() => {
     if (isAuthenticated) {
       refreshProfile();

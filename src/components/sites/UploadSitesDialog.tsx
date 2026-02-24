@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText, Download } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -21,6 +21,38 @@ export default function UploadSitesDialog({ open, onOpenChange, projectId, subpr
   const [uploading, setUploading] = useState(false);
   const [overwrite, setOverwrite] = useState<boolean>(true);
   const [mode, setMode] = useState<'sites' | 'assets'>('sites');
+
+  // ── Sample CSV download ──
+  const downloadSampleFile = () => {
+    let csvContent: string;
+    let filename: string;
+
+    if (mode === 'sites') {
+      csvContent = [
+        'EPS Site Code,AC make,Location Name,Address,City,District,State,Pin code,Site Type,Metro/Urban/S-Urban/Rural,Site Status,Landlord Name,LL Contact,Cm Name,Number,RM Name,Number,remarks',
+        'UBIMH00001,VOLTAS,Kandivali Station,"SHOP NO 1, RAM VILLA AKURLI ROAD",Kandivali,Mumbai,Maharashtra,400101,Offsite,Urban,TIS-COMPLETED,John Doe,9876543210,Sunil B,9867711149,Mahesh,8451053347,',
+        'UBIMH00002,VOLTAS,Malvani Malad,"Shop No-2 Malwani Complex",Malad,Mumbai,Maharashtra,400095,Offsite,Urban,TIS-COMPLETED,Jane Smith,9004291432,Sunil B,9867711149,Mahesh,8451053347,',
+      ].join('\n');
+      filename = 'sample_site_details.csv';
+    } else {
+      csvContent = [
+        'SITE ID,AC MAKE,AC ORDERED,STABILIZER ORDERED,AC DEL,STABILIZER DEL,INSTALLATION SCHEDULED,INSTALLATION DONE,SERIAL NUMBER INDOOR 1,SERIAL NUMBER OUTDOOR 1,SERIAL NUMBER INDOOR 2,SERIAL NUMBER OUTDOOR 2',
+        'UBIMH00001,VOLTAS,13-08-2025,13-08-2025,20-08-2025,26-08-2025,22-08-2025,22-08-2025,4513590G25GC04779,4513590G25GC04783,4553545B25GC05623,4553545B25GC05617',
+        'UBIMH00002,VOLTAS,13-08-2025,13-08-2025,19-08-2025,26-08-2025,22-08-2025,22-08-2025,4513590G25GC04780,4513590G25GC04786,4553545B25GC05577,4553545B25GC05580',
+      ].join('\n');
+      filename = 'sample_asset_details.csv';
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleSubmit = async () => {
     if (!file) return toast.error("Please select a file to upload");
@@ -107,6 +139,18 @@ export default function UploadSitesDialog({ open, onOpenChange, projectId, subpr
             </div>
             <input id="site-upload-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} className="hidden" />
           </div>
+
+          {/* Download sample file */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 w-full"
+            onClick={downloadSampleFile}
+          >
+            <Download className="w-4 h-4" />
+            {mode === 'sites' ? 'Download Sample Site Details File' : 'Download Sample Asset Details File'}
+          </Button>
 
           {/* Overwrite checkbox (sites mode only) */}
           {mode === 'sites' && (

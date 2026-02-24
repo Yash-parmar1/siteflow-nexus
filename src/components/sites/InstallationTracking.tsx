@@ -1,4 +1,4 @@
-import { Package, Truck, User, Calendar, FileCheck, Clock } from "lucide-react";
+import { Package, Truck, User, Calendar, FileCheck, Clock, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Installation {
@@ -9,10 +9,13 @@ interface Installation {
   installer?: string;
   unitsCount: number;
   hasEvidence: boolean;
+  serialNumberImageUrl?: string | null;
+  evidenceImagesJson?: string | null;
 }
 
 interface InstallationTrackingProps {
   installations: Installation[];
+  onViewEvidence?: (inst: Installation) => void;
 }
 
 const shipmentStatusConfig = {
@@ -23,7 +26,7 @@ const shipmentStatusConfig = {
   installed: { label: "Installed", color: "status-success", icon: FileCheck },
 };
 
-export function InstallationTracking({ installations }: InstallationTrackingProps) {
+export function InstallationTracking({ installations, onViewEvidence }: InstallationTrackingProps) {
   return (
     <div className="data-card">
       <div className="flex items-center justify-between mb-5">
@@ -92,7 +95,11 @@ export function InstallationTracking({ installations }: InstallationTrackingProp
               </div>
 
               {installation.hasEvidence && (
-                <button className="text-sm text-primary hover:text-primary/80 shrink-0 transition-colors">
+                <button
+                  className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 shrink-0 transition-colors"
+                  onClick={() => onViewEvidence?.(installation)}
+                >
+                  <Camera className="w-3.5 h-3.5" />
                   View Evidence
                 </button>
               )}

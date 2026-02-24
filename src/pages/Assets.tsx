@@ -44,7 +44,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent } from "@/components/ui/card";
-import { mockACSUnits, mockProjects, getSubprojectById } from "@/data/mockData";
 import { AddUnitDialog } from "@/components/forms/AddUnitDialog";
 import { useAppData, type AssetData } from "@/context/AppDataContext";
 
@@ -55,6 +54,17 @@ const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   "Pending Install": { color: "status-info", icon: <Clock className="w-3.5 h-3.5" /> },
   "In Transit": { color: "status-neutral", icon: <Box className="w-3.5 h-3.5" /> },
 };
+
+function mapAssetStatus(raw: string): string {
+  switch (raw) {
+    case "ACTIVE": return "Operational";
+    case "MAINTENANCE": return "Under Maintenance";
+    case "FAULTY": return "Faulty";
+    case "PENDING": return "Pending Install";
+    case "IN_TRANSIT": return "In Transit";
+    default: return raw || "Operational";
+  }
+}
 
 export default function Assets() {
   const navigate = useNavigate();
@@ -73,48 +83,79 @@ export default function Assets() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [addUnitOpen, setAddUnitOpen] = useState(false);
 
-  // Map live assets into the same shape the page expects, falling back to mockACSUnits
-  const liveUnits = appData?.assets?.length
-    ? appData.assets.map((a: AssetData) => ({
-        id: String(a.id),
-        serialNumber: a.serialNumber ?? "",
-        model: a.model ?? a.manufacturer ?? "Unknown",
-        siteId: a.siteId != null ? String(a.siteId) : "",
-        siteName: a.siteName ?? "Unassigned",
-        location: a.locationInSite ?? "",
-        status: a.status === "ACTIVE" ? "Operational"
-          : a.status === "MAINTENANCE" ? "Under Maintenance"
-          : a.status === "FAULTY" ? "Faulty"
-          : a.status === "PENDING" ? "Pending Install"
-          : a.status === "IN_TRANSIT" ? "In Transit"
-          : a.status ?? "Operational",
-        installDate: "-",
-        lastMaintenance: a.lastMaintenanceDate ?? "-",
-        nextMaintenance: a.nextMaintenanceDate ?? "-",
-        warrantyExpiry: a.warrantyExpiryDate ?? "-",
-        openTickets: 0,
-        projectId: "",
-        projectName: "",
-        subprojectId: "",
-        subprojectName: "",
-        configVersion: "",
-        configuredRent: a.monthlyRent ?? 0,
-        tenureMonths: 0,
-        rentEndDate: "-",
-      }))
-    : null;
+  // Map live assets from backend, deriving install/tenure from related data
+  const units = (appData?.assets ?? []).map((a: AssetData) => {
+    // Find completed installation for this asset
+    const assetInstallation = appData?.installations?.find(
+      (inst) => inst.acAssetId === a.id && inst.installationDate
+    );
+    const installDate = assetInstallation?.installationDate ?? null;
 
-  const units = liveUnits ?? mockACSUnits;
+    // Get site tenure from sites data
+    const site = a.siteId ? appData?.sites?.find((s) => s.id === a.siteId) : null;
+    const tenureMonths = site?.configuredTenure ?? 0;
 
-  // Get subproject info if filtered
-  const subprojectInfo = urlSubprojectId ? getSubprojectById(urlSubprojectId) : null;
-  
-  // Project options
-  const projectOptions = mockProjects.map(p => ({ id: p.id, name: p.name }));
+    // Compute rent end date from install date + tenure
+    let rentEndDate = "-";
+    if (installDate && tenureMonths > 0) {
+      const d = new Date(installDate);
+      d.setMonth(d.getMonth() + tenureMonths);
+      rentEndDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    // Count open tickets for this asset
+    const openTickets = (appData?.maintenanceTickets ?? []).filter(
+      (t) => t.acAssetId === a.id && ["RAISED", "INSPECTED", "QUOTED", "APPROVED"].includes(t.status)
+    ).length;
+
+    return {
+      id: String(a.id),
+      serialNumber: a.serialNumber ?? "",
+      model: a.model ?? a.manufacturer ?? "Unknown",
+      manufacturer: a.manufacturer ?? "",
+      siteId: a.siteId != null ? String(a.siteId) : "",
+      siteName: a.siteName ?? "Unassigned",
+      location: a.locationInSite ?? "",
+      status: mapAssetStatus(a.status),
+      installDate: installDate
+        ? new Date(installDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "-",
+      lastMaintenance: a.lastMaintenanceDate ?? "-",
+      nextMaintenance: a.nextMaintenanceDate ?? "-",
+      warrantyExpiry: a.warrantyExpiryDate ?? "-",
+      openTickets,
+      projectId: a.projectId != null ? String(a.projectId) : "",
+      projectName: a.projectName ?? "",
+      subprojectId: a.subprojectId != null ? String(a.subprojectId) : "",
+      subprojectName: a.subprojectName ?? "",
+      configVersion: site?.configurationId ? `v${site.configurationId}` : "",
+      configuredRent: a.monthlyRent ?? 0,
+      sizeInTon: a.sizeInTon ?? null,
+      isIndoorAc: a.indoorAc,
+      tenureMonths,
+      rentEndDate,
+    };
+  });
+
+  // Derive unique project options from actual data
+  const projectOptions = Array.from(
+    new Map(
+      units.filter(u => u.projectId).map(u => [u.projectId, { id: u.projectId, name: u.projectName }])
+    ).values()
+  );
   
   // Subprojects for selected project
-  const selectedProject = mockProjects.find(p => p.id === projectFilter);
-  const subprojectOptions = selectedProject?.subprojects.map(s => ({ id: s.id, name: s.name })) || [];
+  const subprojectOptions = projectFilter !== "all"
+    ? Array.from(
+        new Map(
+          units.filter(u => u.projectId === projectFilter && u.subprojectId)
+            .map(u => [u.subprojectId, { id: u.subprojectId, name: u.subprojectName }])
+        ).values()
+      )
+    : [];
+
+  // Derive unique models from actual data
+  const uniqueModels = Array.from(new Set(units.map(u => u.model).filter(Boolean)));
 
   const filteredUnits = units.filter((unit) => {
     const matchesSearch =
@@ -129,7 +170,6 @@ export default function Assets() {
   });
 
   const statuses = ["all", "Operational", "Under Maintenance", "Faulty", "Pending Install", "In Transit"];
-  const models = ["all", "ACS Pro X1", "ACS Pro X2", "ACS Lite", "ACS Ultra"];
 
   // Stats (filtered)
   const totalUnits = filteredUnits.length;
@@ -191,16 +231,15 @@ export default function Assets() {
       </div>
 
       {/* Active filter banner */}
-      {subprojectInfo && (
+      {hasActiveFilters && (
         <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FolderKanban className="w-4 h-4 text-primary" />
             <span className="text-sm">
-              Showing units for <strong>{subprojectInfo.project.name}</strong> / <strong>{subprojectInfo.subproject.name}</strong>
+              Filtered by{" "}
+              {projectFilter !== "all" && <strong>{projectOptions.find(p => p.id === projectFilter)?.name ?? "Project"}</strong>}
+              {subprojectFilter !== "all" && <>{" / "}<strong>{subprojectOptions.find(s => s.id === subprojectFilter)?.name ?? "Subproject"}</strong></>}
             </span>
-            <Badge variant="outline" className="text-xs">
-              ₹{subprojectInfo.subproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo • {subprojectInfo.subproject.configuration.tenureMonths}mo tenure
-            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="w-4 h-4 mr-1" />
@@ -328,9 +367,10 @@ export default function Assets() {
               <SelectValue placeholder="Model" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
-              {models.map((model) => (
+              <SelectItem value="all">All Models</SelectItem>
+              {uniqueModels.map((model) => (
                 <SelectItem key={model} value={model}>
-                  {model === "all" ? "All Models" : model}
+                  {model}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -415,8 +455,9 @@ export default function Assets() {
                         <DropdownMenuItem onClick={() => navigate(`/assets/${unit.id}`)}>
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Schedule Maintenance</DropdownMenuItem>
-                        <DropdownMenuItem>Create Ticket</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate(`/site/${unit.siteId}`)}>
+                          View Site
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
