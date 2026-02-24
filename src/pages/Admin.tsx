@@ -5,7 +5,6 @@ import { EditUserDialog } from "@/components/forms/EditUserDialog";
 import { DeleteUserDialog } from "@/components/forms/DeleteUserDialog";
 import { DeactivateUserDialog } from "@/components/forms/DeactivateUserDialog";
 // Reset password removed as per requirements
-import AuditLogViewer from "@/components/reports/AuditLogViewer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,11 +93,12 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [users, setUsers] = useState<UserType[]>([]);
   const [pendingUsers, setPendingUsers] = useState<UserType[]>([]);
+  const [auditEntries, setAuditEntries] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Record<string,string>>({});
   const [roles, setRoles] = useState<RoleType[]>([]);
 
-  useEffect(() => { fetchUsers(); fetchPending(); fetchRoles(); }, []);
+  useEffect(() => { fetchUsers(); fetchPending(); fetchLogs(); fetchRoles(); }, []);
 
   async function fetchRoles() {
     try {
@@ -109,7 +109,7 @@ export default function Admin() {
     }
   }
 
-  useEffect(() => { fetchUsers(); fetchPending(); }, []);
+  useEffect(() => { fetchUsers(); fetchPending(); fetchLogs(); }, []);
 
   async function fetchUsers() {
     try {
@@ -131,6 +131,15 @@ export default function Admin() {
       setPendingUsers(data.map((u: any) => ({ ...u, displayName: u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : (u.username || u.email) })));
     } catch (err) {
       console.error('Failed to load pending users', err);
+    }
+  }
+
+  async function fetchLogs() {
+    try {
+      const resp = await api.get('/admin/logs');
+      setAuditEntries(resp.data || []);
+    } catch (err) {
+      console.error('Failed to load logs', err);
     }
   }
 
@@ -294,7 +303,14 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="audit">
-          <AuditLogViewer />
+          <Card className="border-border/60">
+            <CardHeader className="pb-3"><div className="flex items-center justify-between"><div><CardTitle className="text-lg">Audit Log</CardTitle><CardDescription>Track all system activities</CardDescription></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={fetchLogs}><RefreshCw className="w-4 h-4" />Refresh</Button><Button variant="outline" size="sm"><Download className="w-4 h-4" />Export</Button></div></div></CardHeader>
+            <CardContent className="p-0">
+              <Table><TableHeader><TableRow className="hover:bg-transparent border-border"><TableHead>Action</TableHead><TableHead>User</TableHead><TableHead>Timestamp</TableHead><TableHead>IP Address</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>{auditEntries.map((log: any, index) => (<TableRow key={index} className="hover:bg-muted/50 border-border/50"><TableCell className="font-medium">{log.action || log.message || log.type}</TableCell><TableCell>{(log.performedBy && log.performedBy.username) || log.username || log.user || log.performedBy}</TableCell><TableCell className="text-muted-foreground">{log.timestamp || log.performedAt || log.createdAt}</TableCell><TableCell className="text-muted-foreground font-mono text-xs">{log.ip || '-'}</TableCell><TableCell><Badge className={log.status === "Success" ? "bg-[hsl(var(--status-success)/0.15)] text-[hsl(var(--status-success))] border-0" : "bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))] border-0"}>{log.status || log.result || '-'}</Badge></TableCell></TableRow>))}</TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings">

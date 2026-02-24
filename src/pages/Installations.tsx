@@ -23,12 +23,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Search,
   Plus,
   Filter,
@@ -46,8 +40,6 @@ import {
   FileText,
   Camera,
   Upload,
-  X,
-  ImageIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +48,100 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppData, type InstallationData } from "@/context/AppDataContext";
+
+// Hardcoded fallback data (kept for reference)
+const mockInstallations = [
+  {
+    id: "INS-001",
+    docketId: "DOC-2024-0045",
+    site: "Metro Tower - Block A",
+    siteId: "site-001",
+    units: 3,
+    status: "In Transit",
+    progress: 40,
+    shipmentDate: "Dec 20, 2024",
+    eta: "Dec 26, 2024",
+    installer: "TechServe Solutions",
+    installerContact: "+91 98765 43210",
+    priority: "High",
+    notes: "Expedited shipping requested",
+  },
+  {
+    id: "INS-002",
+    docketId: "DOC-2024-0044",
+    site: "Phoenix Mall Expansion",
+    siteId: "site-002",
+    units: 5,
+    status: "Scheduled",
+    progress: 15,
+    shipmentDate: "Dec 18, 2024",
+    eta: "Dec 28, 2024",
+    installer: "AirCool Installers",
+    installerContact: "+91 98765 12345",
+    priority: "Medium",
+    notes: "",
+  },
+  {
+    id: "INS-003",
+    docketId: "DOC-2024-0043",
+    site: "DLF Cyber City Phase 3",
+    siteId: "site-005",
+    units: 8,
+    status: "Installing",
+    progress: 75,
+    shipmentDate: "Dec 10, 2024",
+    eta: "Dec 22, 2024",
+    installer: "ProInstall Inc.",
+    installerContact: "+91 87654 32109",
+    priority: "High",
+    notes: "6 of 8 units installed",
+  },
+  {
+    id: "INS-004",
+    docketId: "DOC-2024-0042",
+    site: "Prestige Tech Park",
+    siteId: "site-004",
+    units: 4,
+    status: "Completed",
+    progress: 100,
+    shipmentDate: "Dec 05, 2024",
+    eta: "Dec 15, 2024",
+    installer: "TechServe Solutions",
+    installerContact: "+91 98765 43210",
+    priority: "Low",
+    notes: "Installation completed ahead of schedule",
+  },
+  {
+    id: "INS-005",
+    docketId: "DOC-2024-0041",
+    site: "Mindspace IT Park",
+    siteId: "site-006",
+    units: 10,
+    status: "Pending Dispatch",
+    progress: 5,
+    shipmentDate: "-",
+    eta: "Jan 05, 2025",
+    installer: "AirCool Installers",
+    installerContact: "+91 98765 12345",
+    priority: "Medium",
+    notes: "Awaiting site readiness confirmation",
+  },
+  {
+    id: "INS-006",
+    docketId: "DOC-2024-0040",
+    site: "Cyber Hub Tower 5",
+    siteId: "site-003",
+    units: 2,
+    status: "Delayed",
+    progress: 30,
+    shipmentDate: "Dec 08, 2024",
+    eta: "Dec 30, 2024",
+    installer: "ProInstall Inc.",
+    installerContact: "+91 87654 32109",
+    priority: "High",
+    notes: "Delay due to site access issues",
+  },
+];
 
 const statusConfig: Record<string, { color: string; bgColor: string }> = {
   "Pending Dispatch": { color: "text-muted-foreground", bgColor: "bg-muted" },
@@ -78,74 +164,35 @@ export default function Installations() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [evidenceDialog, setEvidenceDialog] = useState<{ open: boolean; title: string; images: string[]; serialImg: string | null }>({ open: false, title: "", images: [], serialImg: null });
   const { data: appData } = useAppData();
 
-  // Map live installation data from backend
-  function mapShipmentStatus(raw: string): string {
-    switch (raw) {
-      case "PENDING": return "Pending Dispatch";
-      case "IN_TRANSIT": return "In Transit";
-      case "DELIVERED": return "Scheduled";
-      case "INSTALLING": return "Installing";
-      case "INSTALLED": return "Completed";
-      case "DELAYED": return "Delayed";
-      default: return raw ?? "Pending Dispatch";
-    }
-  }
+  // Map live installation data from backend, or fallback to hardcoded mockInstallations
+  const liveInstallations = appData?.installations?.length
+    ? appData.installations.map((inst: InstallationData) => ({
+        id: `INS-${String(inst.id).padStart(3, "0")}`,
+        docketId: inst.bookingId ?? `DOC-${inst.id}`,
+        site: inst.siteName ?? "Unknown",
+        siteId: String(inst.siteId),
+        units: 1,
+        status: inst.shipmentStatus === "PENDING" ? "Pending Dispatch"
+          : inst.shipmentStatus === "IN_TRANSIT" ? "In Transit"
+          : inst.shipmentStatus === "DELIVERED" ? "Scheduled"
+          : inst.shipmentStatus === "INSTALLED" ? "Completed"
+          : inst.shipmentStatus ?? "Pending Dispatch",
+        progress: inst.shipmentStatus === "INSTALLED" ? 100
+          : inst.shipmentStatus === "DELIVERED" ? 75
+          : inst.shipmentStatus === "IN_TRANSIT" ? 40
+          : 5,
+        shipmentDate: inst.createdAt ? new Date(inst.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+        eta: inst.eta ?? "-",
+        installer: "-",
+        installerContact: "-",
+        priority: "Medium",
+        notes: inst.remarks ?? "",
+      }))
+    : null;
 
-  function deriveProgress(raw: string): number {
-    switch (raw) {
-      case "INSTALLED": return 100;
-      case "INSTALLING": return 75;
-      case "DELIVERED": return 60;
-      case "IN_TRANSIT": return 40;
-      case "PENDING": return 5;
-      case "DELAYED": return 30;
-      default: return 10;
-    }
-  }
-
-  function derivePriority(raw: string, eta: string | null): string {
-    if (raw === "DELAYED") return "High";
-    if (raw === "INSTALLED") return "Low";
-    // If ETA is past due
-    if (eta) {
-      try {
-        const etaDate = new Date(eta);
-        if (etaDate < new Date()) return "High";
-      } catch { /* ignore */ }
-    }
-    if (raw === "PENDING") return "Medium";
-    if (raw === "IN_TRANSIT") return "Medium";
-    return "Low";
-  }
-
-  const installations = (appData?.installations ?? []).map((inst: InstallationData) => ({
-    id: `INS-${String(inst.id).padStart(3, "0")}`,
-    rawId: inst.id,
-    docketId: inst.bookingId ?? `DOC-${inst.id}`,
-    site: inst.siteName ?? "Unknown",
-    siteId: String(inst.siteId),
-    units: 1,
-    status: mapShipmentStatus(inst.shipmentStatus),
-    progress: deriveProgress(inst.shipmentStatus),
-    shipmentDate: inst.bookingDate
-      ? new Date(inst.bookingDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-      : inst.createdAt
-      ? new Date(inst.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-      : "-",
-    eta: inst.eta
-      ? new Date(inst.eta).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-      : "-",
-    installer: inst.receiverName ?? "-",
-    installerContact: inst.receiverNumber ?? "-",
-    priority: derivePriority(inst.shipmentStatus, inst.eta),
-    notes: inst.remarks ?? "",
-    acAssetSerial: inst.acAssetSerial ?? "",
-    serialNumberImageUrl: inst.serialNumberImageUrl,
-    evidenceImagesJson: inst.evidenceImagesJson,
-  }));
+  const installations = liveInstallations ?? mockInstallations;
 
   const filteredInstallations = installations.filter((inst) => {
     const matchesSearch =
@@ -345,43 +392,15 @@ export default function Installations() {
 
                 {/* Right Section - Actions */}
                 <div className="flex lg:flex-col gap-2 shrink-0">
-                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => {
-                    e.stopPropagation();
-                    // Documents = serial number image / docket info
-                    setEvidenceDialog({
-                      open: true,
-                      title: `Documents — ${inst.docketId}`,
-                      images: [],
-                      serialImg: inst.serialNumberImageUrl ?? null,
-                    });
-                  }}>
+                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => e.stopPropagation()}>
                     <FileText className="w-4 h-4" />
                     Documents
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => {
-                    e.stopPropagation();
-                    // Evidence = installation site photos
-                    const images: string[] = [];
-                    if (inst.evidenceImagesJson) {
-                      try {
-                        const parsed = JSON.parse(inst.evidenceImagesJson);
-                        if (Array.isArray(parsed)) images.push(...parsed);
-                      } catch { /* ignore */ }
-                    }
-                    setEvidenceDialog({
-                      open: true,
-                      title: `Evidence — ${inst.acAssetSerial || inst.docketId}`,
-                      images,
-                      serialImg: null,
-                    });
-                  }}>
+                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => e.stopPropagation()}>
                     <Camera className="w-4 h-4" />
                     Evidence
                   </Button>
-                  <Button size="sm" className="flex-1 lg:flex-none" onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/site/${inst.siteId}`);
-                  }}>
+                  <Button size="sm" className="flex-1 lg:flex-none" onClick={(e) => e.stopPropagation()}>
                     View Site
                     <ArrowRight className="w-4 h-4" />
                   </Button>
@@ -406,55 +425,6 @@ export default function Installations() {
 
       <AddInstallationDialog open={showAddDialog} onOpenChange={setShowAddDialog} />
       <ImportInstallationsDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
-
-      {/* Evidence / Documents Dialog */}
-      <Dialog open={evidenceDialog.open} onOpenChange={(o) => setEvidenceDialog((prev) => ({ ...prev, open: o }))}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto bg-background border-border">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5 text-primary" />
-              {evidenceDialog.title}
-            </DialogTitle>
-          </DialogHeader>
-
-          {evidenceDialog.serialImg && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Serial Number Image</p>
-              <div className="rounded-lg border border-border overflow-hidden bg-muted/30">
-                <img
-                  src={evidenceDialog.serialImg.startsWith("http") ? evidenceDialog.serialImg : `/api/files/${evidenceDialog.serialImg}`}
-                  alt="Serial Number"
-                  className="w-full max-h-64 object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).src = ""; (e.target as HTMLImageElement).alt = "Image not available"; }}
-                />
-              </div>
-            </div>
-          )}
-
-          {evidenceDialog.images.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Evidence Photos ({evidenceDialog.images.length})</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {evidenceDialog.images.map((url, idx) => (
-                  <div key={idx} className="rounded-lg border border-border overflow-hidden bg-muted/30 aspect-square">
-                    <img
-                      src={url.startsWith("http") ? url : `/api/files/${url}`}
-                      alt={`Evidence ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = ""; (e.target as HTMLImageElement).alt = "Image not available"; }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : !evidenceDialog.serialImg ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ImageIcon className="w-12 h-12 text-muted-foreground/30 mb-3" />
-              <p className="text-sm text-muted-foreground">No evidence images available for this installation.</p>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

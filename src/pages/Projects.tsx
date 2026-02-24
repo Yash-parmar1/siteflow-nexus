@@ -490,7 +490,7 @@ export default function Projects() {
           const isExpanded = expandedProjects.has(project.id);
           const projectStats = {
             monthlyRevenue: Number(project.monthlyRevenue || 0),
-            activeACS: project.activeACS || 0,
+            activeACS: project.totalACS || 0,
             totalACS: project.totalACS || 0,
             totalSites: project.totalSites ?? 0,
           };
@@ -643,7 +643,7 @@ export default function Projects() {
                                 {config ? (
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                     <div className="space-y-1">
-                                      <div className="text-xs text-muted-foreground">Base Rent per asset </div>
+                                      <div className="text-xs text-muted-foreground">Base Rent</div>
                                       <div className="font-medium text-foreground flex items-center gap-1">
                                         <IndianRupee className="w-3.5 h-3.5" />
                                         {config.baseMonthlyRent.toLocaleString("en-IN")}/mo
@@ -687,25 +687,9 @@ export default function Projects() {
                                     <Badge variant="outline" className={cn("text-xs", statusColors[subproject.status] || "bg-muted text-muted-foreground")}>{subproject.status}</Badge>
                                   )}
                                 </div>
-                                <div className="flex gap-2 items-center mt-2">
-                                  <Button 
-                                    variant="default" 
-                                    size="sm" 
-                                    className="gap-1.5"
-                                    onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }}
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Import Sites / Assets
-                                  </Button>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="gap-1.5"
-                                    onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }}
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    View Imports
-                                  </Button>
+                                <div className="flex gap-2 items-center">
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Sites</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }} className="text-sm text-muted-foreground hover:underline">View Imports</button>
                                 </div>
                               </div>
                               

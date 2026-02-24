@@ -12,89 +12,51 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus, Filter, Grid3X3, List, FolderKanban, X } from "lucide-react";
+import { mockSites, mockProjects, getSubprojectById } from "@/data/mockData";
 import { Badge } from "@/components/ui/badge";
-import { useAppData, type SiteData } from "@/context/AppDataContext";
 
 export function SiteList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: appData } = useAppData();
   
   // Read filters from URL
   const urlProjectId = searchParams.get("projectId") || "";
   const urlSubprojectId = searchParams.get("subprojectId") || "";
-
+  
+  // If we have a subprojectId but no projectId, derive projectId from mockSites
+  const derivedProjectId = urlSubprojectId 
+    ? mockSites.find(s => s.subprojectId === urlSubprojectId)?.projectId || ""
+    : urlProjectId;
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
-  const [projectFilter, setProjectFilter] = useState<string>(urlProjectId || "all");
+  const [projectFilter, setProjectFilter] = useState<string>(derivedProjectId || "all");
   const [subprojectFilter, setSubprojectFilter] = useState<string>(urlSubprojectId || "all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [addSiteOpen, setAddSiteOpen] = useState(false);
 
-  // Map live site data from backend
-  const sites = (appData?.sites ?? []).map((s: SiteData) => {
-    let location = "";
-    try {
-      if (s.addressJson) {
-        const addr = JSON.parse(s.addressJson);
-        location = [addr.city, addr.state].filter(Boolean).join(", ");
-      }
-    } catch { /* ignore */ }
+  // Get subproject info if filtered
+  const subprojectInfo = urlSubprojectId ? getSubprojectById(urlSubprojectId) : null;
 
-    return {
-      id: String(s.id),
-      name: s.name,
-      location,
-      stage: s.currentStage ?? "PLANNING",
-      progress: s.progress ?? 0,
-      acsPlanned: s.plannedAcsCount ?? s.acsPlanned ?? 0,
-      acsInstalled: s.acsInstalled ?? 0,
-      hasDelay: s.hasDelay ?? false,
-      delayDays: s.delayDays ?? 0,
-      projectId: s.projectId ? String(s.projectId) : "",
-      projectName: s.projectName ?? "",
-      subprojectId: s.subprojectId ? String(s.subprojectId) : "",
-      subprojectName: s.subprojectName ?? "",
-      configuredRent: s.configuredRent ?? 0,
-      configuredTenure: s.configuredTenure ?? 0,
-      siteCode: s.siteCode ?? "",
-      status: s.status ?? "ACTIVE",
-      currentStage: s.currentStage ?? "PLANNING",
-    };
-  });
-
-  // Derive unique projects from data
-  const projectOptions = Array.from(
-    new Map(
-      sites.filter(s => s.projectId).map(s => [s.projectId, { id: s.projectId, name: s.projectName }])
-    ).values()
-  );
-
+  // Unique projects for filter
+  const projectOptions = mockProjects.map(p => ({ id: p.id, name: p.name }));
+  
   // Subprojects for selected project
-  const subprojectOptions = projectFilter !== "all"
-    ? Array.from(
-        new Map(
-          sites.filter(s => s.projectId === projectFilter && s.subprojectId)
-            .map(s => [s.subprojectId, { id: s.subprojectId, name: s.subprojectName }])
-        ).values()
-      )
-    : [];
+  const selectedProject = mockProjects.find(p => p.id === projectFilter);
+  const subprojectOptions = selectedProject?.subprojects.map(s => ({ id: s.id, name: s.name })) || [];
 
-  const filteredSites = sites.filter((site) => {
+  const filteredSites = mockSites.filter((site) => {
     const matchesSearch =
       site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       site.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      site.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      site.siteCode.toLowerCase().includes(searchQuery.toLowerCase());
+      site.projectName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStage = stageFilter === "all" || site.stage === stageFilter;
     const matchesProject = projectFilter === "all" || site.projectId === projectFilter;
     const matchesSubproject = subprojectFilter === "all" || site.subprojectId === subprojectFilter;
     return matchesSearch && matchesStage && matchesProject && matchesSubproject;
   });
 
-  // Derive unique stages from data
-  const uniqueStages = Array.from(new Set(sites.map(s => s.stage).filter(Boolean)));
-  const stages = ["all", ...uniqueStages];
+  const stages = ["all", "Started", "WTS", "WIP", "TIS", "Installed", "Live"];
 
   const clearFilters = () => {
     setProjectFilter("all");
@@ -144,15 +106,16 @@ export function SiteList() {
       </div>
 
       {/* Active filter banner */}
-      {hasActiveFilters && (
+      {subprojectInfo && (
         <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FolderKanban className="w-4 h-4 text-primary" />
             <span className="text-sm">
-              Filtered by{" "}
-              {projectFilter !== "all" && <strong>{projectOptions.find(p => p.id === projectFilter)?.name ?? "Project"}</strong>}
-              {subprojectFilter !== "all" && <>{" / "}<strong>{subprojectOptions.find(s => s.id === subprojectFilter)?.name ?? "Subproject"}</strong></>}
+              Showing sites for <strong>{subprojectInfo.project.name}</strong> / <strong>{subprojectInfo.subproject.name}</strong>
             </span>
+            <Badge variant="outline" className="text-xs">
+              ₹{subprojectInfo.subproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo • {subprojectInfo.subproject.configuration.tenureMonths}mo tenure
+            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="w-4 h-4 mr-1" />

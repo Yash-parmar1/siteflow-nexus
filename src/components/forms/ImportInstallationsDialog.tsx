@@ -460,33 +460,6 @@ export function ImportInstallationsDialog({
                   Spare Involved, OTP Verified, Rating, Serial Image URL, Evidence URLs…
                 </p>
               </div>
-
-              {/* Download sample file */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2 w-full"
-                onClick={() => {
-                  const csvContent = [
-                    'Sub_Order_ID,Item Order ID,Serial Number,Customer Name,Mobile,Product,Brand,Category,Size,Model Number,City,State,Upcountry,Booking ID,247Around Item ID,Booking Date,Closed Date,Sf Closed Date,Status,Spare Involved,Otp Verified,Rating,Serial Number Image',
-                    '04112514,,AAAPF6007110JR8ML4M0,Sujit Mahapatra,8457999911,Air Conditioner,Nexgen,AC-SPLIT,1 Ton,HSU14E-TXG5BN-INV:AC,nayagarh,Odisha,NO,YK-17323982511042,2879802,01-Dec-25,02-Dec-25,01-Dec-25,Installation & Demo (Free),No,Yes,,',
-                    '04112517,,AAAPF6007110JR8MA2DT,John Doe,9876543210,Air Conditioner,Nexgen,AC-SPLIT,1.5 Ton,HSU18E-TXG5BN-INV:AC,bhadrak,Odisha,NO,YK-17323982511045,2879805,02-Dec-25,02-Dec-25,02-Dec-25,Installation & Demo (Free),No,Yes,,',
-                  ].join('\n');
-                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = 'sample_installation_data.csv';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                <Download className="w-4 h-4" />
-                Download Sample Installation File
-              </Button>
             </div>
 
             <DialogFooter className="gap-2">

@@ -16,7 +16,7 @@ interface ProjectBoundSiteCardProps {
     // Project binding
     projectName: string;
     subprojectName?: string;
-    configVersion?: string;
+    configVersion: string;
     configuredRent: number;
     configuredTenure: number;
   };
@@ -66,7 +66,7 @@ export function ProjectBoundSiteCard({ site, onClick }: ProjectBoundSiteCardProp
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <Lock className="w-3 h-3" />
-                <span>Bound Configuration v{site.configVersion || "1.0"}</span>
+                <span>Bound Configuration v{site.configVersion}</span>
               </div>
               <div>Rent: ₹{site.configuredRent.toLocaleString("en-IN")}/mo</div>
               <div>Tenure: {site.configuredTenure} months</div>

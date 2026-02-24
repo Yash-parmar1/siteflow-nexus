@@ -1,4 +1,4 @@
-import { Box, MapPin, Calendar, Wrench, AlertCircle, Clock, IndianRupee, TrendingDown, Wind, Thermometer } from "lucide-react";
+import { Box, MapPin, Calendar, Wrench, AlertCircle, Clock, IndianRupee, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +20,6 @@ interface ACSUnitWithTenure {
   lastMaintenance?: string;
   hasIssue?: boolean;
   configurationVersion?: string;
-  isIndoor?: boolean;
 }
 
 interface ACSContractCardProps {
@@ -90,15 +89,6 @@ export function ACSContractCard({ unit, onClick }: ACSContractCardProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-foreground">{unit.serialNumber}</span>
-              {unit.isIndoor !== undefined && (
-                <span className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
-                  unit.isIndoor ? "bg-blue-500/10 text-blue-600" : "bg-orange-500/10 text-orange-600"
-                )}>
-                  {unit.isIndoor ? <Thermometer className="w-3 h-3" /> : <Wind className="w-3 h-3" />}
-                  {unit.isIndoor ? "Indoor" : "Outdoor"}
-                </span>
-              )}
               {unit.hasIssue && <AlertCircle className="w-4 h-4 text-status-error" />}
             </div>
             <span className="text-xs text-muted-foreground">{unit.model}</span>

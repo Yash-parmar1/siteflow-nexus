@@ -179,7 +179,7 @@ export function AddSiteDialog({
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
-                    <div className="text-xs text-muted-foreground">Base Rent </div>
+                    <div className="text-xs text-muted-foreground">Base Rent</div>
                     <div className="font-medium flex items-center gap-1">
                       <IndianRupee className="w-3 h-3" />
                       {selectedSubproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo
