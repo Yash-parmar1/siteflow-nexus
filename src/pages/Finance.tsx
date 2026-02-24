@@ -109,6 +109,7 @@ export default function Finance() {
   const { toast } = useToast();
   const { data: appData } = useAppData();
   const [showCreateInvoiceDialog, setShowCreateInvoiceDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [txSearch, setTxSearch] = useState("");
   const [txStatusFilter, setTxStatusFilter] = useState("all");
   const [txDirectionFilter, setTxDirectionFilter] = useState("all");
