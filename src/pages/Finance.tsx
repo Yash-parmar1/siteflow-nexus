@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppData } from "@/context/AppDataContext";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Tooltip } from "recharts";
 import { Separator } from "@/components/ui/separator";
+import GenerateInvoiceTab from "@/components/finance/GenerateInvoiceTab";
 
 // ── Mock data aligned to DB schema ──────────────────────────────
 
@@ -198,6 +199,7 @@ export default function Finance() {
           <TabsTrigger value="overdue">Overdue & Ageing</TabsTrigger>
           <TabsTrigger value="materials">Materials Cost</TabsTrigger>
           <TabsTrigger value="gst">GST Report</TabsTrigger>
+          <TabsTrigger value="generate-invoice">Generate Invoice</TabsTrigger>
         </TabsList>
 
         {/* ═══════════════ TAB 1: OVERVIEW ═══════════════ */}
@@ -589,6 +591,10 @@ export default function Finance() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+        {/* ═══════════════ TAB 7: GENERATE INVOICE ═══════════════ */}
+        <TabsContent value="generate-invoice">
+          <GenerateInvoiceTab />
         </TabsContent>
       </Tabs>
 
