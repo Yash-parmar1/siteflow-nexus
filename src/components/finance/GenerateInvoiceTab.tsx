@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,41 +16,29 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 
-// ── Mock data ──────────────────────────────────────────────────
-const mockClients = [
-  { id: "c1", name: "DLF Commercial" },
-  { id: "c2", name: "Prestige Estates" },
-  { id: "c3", name: "Metro Properties" },
-];
+// ── Types matching backend DTOs ────────────────────────────────
 
-const mockProjects: Record<string, { id: string; name: string }[]> = {
-  c1: [{ id: "p1", name: "DLF Towers AC Project" }, { id: "p2", name: "DLF IT Park Phase 2" }],
-  c2: [{ id: "p3", name: "Prestige HQ Retrofit" }],
-  c3: [{ id: "p4", name: "Metro Mall Cooling" }],
-};
+interface DropdownItem { id: number; name: string }
+interface ProjectItem { id: number; name: string; clientId: number }
+interface SubprojectItem { id: number; name: string; projectId: number }
 
-const mockSubprojects: Record<string, { id: string; name: string }[]> = {
-  p1: [{ id: "sp1", name: "Delhi NCR" }, { id: "sp2", name: "Gurugram" }, { id: "sp3", name: "Noida" }],
-  p2: [{ id: "sp4", name: "Phase 2A" }, { id: "sp5", name: "Phase 2B" }],
-  p3: [{ id: "sp6", name: "Bangalore HQ" }],
-  p4: [{ id: "sp7", name: "Ground Floor" }, { id: "sp8", name: "First Floor" }],
-};
+interface FormData {
+  clients: DropdownItem[];
+  projects: ProjectItem[];
+  subprojects: SubprojectItem[];
+  states: string[];
+  invoiceTypes: string[];
+}
 
-const mockStates = ["Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "Telangana"];
-
-const mockPendingUploads = [
-  { id: "pu1", message: "3 sites in 'Delhi NCR' have unprocessed material uploads from Jan 2025", severity: "amber" },
-  { id: "pu2", message: "Vendor reconciliation pending for 'Gurugram' subproject – Dec 2024", severity: "amber" },
-];
-
-const mockReconciliation = [
-  { month: "Oct 2024", ourAmount: 180000, vendorAmount: 180000, variance: 0, billed: true, paid: true, status: "Matched" },
-  { month: "Nov 2024", ourAmount: 185000, vendorAmount: 184200, variance: 800, billed: true, paid: true, status: "Variance" },
-  { month: "Dec 2024", ourAmount: 190000, vendorAmount: 189500, variance: 500, billed: true, paid: false, status: "Variance" },
-  { month: "Jan 2025", ourAmount: 195000, vendorAmount: 0, variance: 195000, billed: true, paid: false, status: "Not Uploaded" },
-  { month: "Feb 2025", ourAmount: 0, vendorAmount: 0, variance: 0, billed: false, paid: false, status: "Future" },
-  { month: "Mar 2025", ourAmount: 0, vendorAmount: 0, variance: 0, billed: false, paid: false, status: "Future" },
-];
+interface ReconciliationRow {
+  month: string;
+  ourAmount: number;
+  vendorAmount: number;
+  variance: number;
+  billed: boolean;
+  paid: boolean;
+  status: string;
+}
 
 const INVOICE_CATEGORIES = [
   { id: "installation", label: "Installation", gstNote: "18% GST on installation services" },
@@ -71,13 +59,46 @@ const statusConfig: Record<string, string> = {
 export default function GenerateInvoiceTab() {
   const { toast } = useToast();
 
-  // Notification banners
-  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
-  const visibleBanners = mockPendingUploads.filter((b) => !dismissedBanners.has(b.id));
+  // ── Form data from backend ───────────────────────────────────
+  const [formData, setFormData] = useState<FormData | null>(null);
+  const [loadingFormData, setLoadingFormData] = useState(false);
 
-  const dismissBanner = useCallback(async (id: string) => {
+  // Notification banners
+  const [pendingNotifications, setPendingNotifications] = useState<{ id: number; message: string; severity: string }[]>([]);
+  const [dismissedBanners, setDismissedBanners] = useState<Set<number>>(new Set());
+  const visibleBanners = pendingNotifications.filter((b) => !dismissedBanners.has(b.id));
+
+  // Load form data on mount
+  useEffect(() => {
+    const loadFormData = async () => {
+      setLoadingFormData(true);
+      try {
+        const res = await api.get('/finance/invoice/form-data');
+        setFormData(res.data);
+      } catch {
+        toast({ title: "Error", description: "Failed to load form data", variant: "destructive" });
+      } finally {
+        setLoadingFormData(false);
+      }
+    };
+    loadFormData();
+
+    // Also load pending notifications
+    api.get('/finance/notifications/pending')
+      .then(res => {
+        const items = (res.data || []).map((n: any) => ({
+          id: n.id,
+          message: n.message || n.content || 'Pending upload notification',
+          severity: 'amber',
+        }));
+        setPendingNotifications(items);
+      })
+      .catch(() => {});
+  }, []);
+
+  const dismissBanner = useCallback(async (id: number) => {
     try {
-      // await api.put(`/uploads/pending/${id}/dismiss`);
+      await api.put(`/finance/notifications/${id}/read`);
       setDismissedBanners((prev) => new Set(prev).add(id));
     } catch {
       toast({ title: "Error", description: "Failed to dismiss notification", variant: "destructive" });
@@ -96,8 +117,43 @@ export default function GenerateInvoiceTab() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const projects = selectedClient ? mockProjects[selectedClient] || [] : [];
-  const subprojects = selectedProject ? mockSubprojects[selectedProject] || [] : [];
+  // Cascade: filter projects by selected client, subprojects by selected project
+  const clients = formData?.clients || [];
+  const projects = useMemo(() => {
+    if (!formData?.projects) return [];
+    if (!selectedClient) return [];
+    return formData.projects.filter(p => String(p.clientId) === selectedClient);
+  }, [formData?.projects, selectedClient]);
+
+  const subprojects = useMemo(() => {
+    if (!formData?.subprojects) return [];
+    if (!selectedProject) return [];
+    return formData.subprojects.filter(s => String(s.projectId) === selectedProject);
+  }, [formData?.subprojects, selectedProject]);
+
+  const states = formData?.states || [];
+
+  // Re-fetch projects when client changes
+  useEffect(() => {
+    if (selectedClient && formData) {
+      api.get(`/finance/invoice/form-data?clientId=${selectedClient}`)
+        .then(res => {
+          setFormData(prev => prev ? { ...prev, projects: res.data.projects, subprojects: res.data.subprojects } : prev);
+        })
+        .catch(() => {});
+    }
+  }, [selectedClient]);
+
+  // Re-fetch subprojects when project changes
+  useEffect(() => {
+    if (selectedProject && formData) {
+      api.get(`/finance/invoice/form-data?projectId=${selectedProject}`)
+        .then(res => {
+          setFormData(prev => prev ? { ...prev, subprojects: res.data.subprojects } : prev);
+        })
+        .catch(() => {});
+    }
+  }, [selectedProject]);
 
   const toggleCategory = (id: string) => {
     setSelectedCategories((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
@@ -106,7 +162,7 @@ export default function GenerateInvoiceTab() {
     setSelectedSubprojects((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
   };
   const selectAllSubprojects = () => {
-    setSelectedSubprojects(selectedSubprojects.length === subprojects.length ? [] : subprojects.map((s) => s.id));
+    setSelectedSubprojects(selectedSubprojects.length === subprojects.length ? [] : subprojects.map((s) => String(s.id)));
   };
 
   const canGenerate = selectedClient && selectedProject && selectedSubprojects.length > 0 && billingMonth && selectedCategories.length > 0;
@@ -114,9 +170,35 @@ export default function GenerateInvoiceTab() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      // Simulating API call
-      await new Promise((r) => setTimeout(r, 2000));
-      // const res = await api.post("/finance/generate-invoice", { ... }, { responseType: "blob" });
+      // Format billing month from "2025-01" to "Jan'25"
+      const [y, m] = billingMonth.split('-');
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const formattedMonth = `${monthNames[parseInt(m, 10) - 1]}'${y.slice(2)}`;
+
+      // Map category IDs to backend invoice type names
+      const typeMap: Record<string, string> = {
+        installation: 'INSTALLATION',
+        extra_materials: 'EXTRA_MATERIALS',
+        maintenance: 'MAINTENANCE',
+      };
+
+      const res = await api.post('/finance/invoice/generate', {
+        clientId: Number(selectedClient),
+        projectId: Number(selectedProject),
+        subprojectIds: selectedSubprojects.map(Number),
+        stateFilter: selectedState && selectedState !== 'all' ? selectedState : null,
+        invoiceTypes: selectedCategories.map(c => typeMap[c] || c.toUpperCase()),
+        billingMonth: formattedMonth,
+      }, { responseType: 'blob' });
+
+      // Download the file
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice_${formattedMonth}_${selectedCategories.join('-')}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+
       toast({ title: "Invoice Generated", description: "Your .xlsx invoice has been downloaded" });
     } catch {
       toast({ title: "Error", description: "Failed to generate invoice", variant: "destructive" });
@@ -129,6 +211,43 @@ export default function GenerateInvoiceTab() {
   const [rentFrom, setRentFrom] = useState("");
   const [rentTo, setRentTo] = useState("");
   const [rentSubproject, setRentSubproject] = useState("");
+  const [reconciliation, setReconciliation] = useState<ReconciliationRow[]>([]);
+  const [isDownloadingRent, setIsDownloadingRent] = useState(false);
+
+  // Load reconciliation when rent subproject changes
+  useEffect(() => {
+    if (rentSubproject) {
+      api.get(`/finance/rent-report/reconciliation?subprojectId=${rentSubproject}`)
+        .then(res => setReconciliation(res.data || []))
+        .catch(() => setReconciliation([]));
+    }
+  }, [rentSubproject]);
+
+  const handleDownloadRentReport = async () => {
+    if (!rentSubproject || !rentFrom || !rentTo) {
+      toast({ title: "Missing fields", description: "Select subproject and date range", variant: "destructive" });
+      return;
+    }
+    setIsDownloadingRent(true);
+    try {
+      const res = await api.post(
+        `/finance/rent-report/generate?subprojectId=${rentSubproject}&fromMonth=${rentFrom}&toMonth=${rentTo}`,
+        null,
+        { responseType: 'blob' }
+      );
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `RentReport_${rentSubproject}_${rentFrom}_to_${rentTo}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Report Downloaded", description: "Rent report Excel downloaded" });
+    } catch {
+      toast({ title: "Error", description: "Failed to generate rent report", variant: "destructive" });
+    } finally {
+      setIsDownloadingRent(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -160,7 +279,7 @@ export default function GenerateInvoiceTab() {
               <Select value={selectedClient} onValueChange={(v) => { setSelectedClient(v); setSelectedProject(""); setSelectedSubprojects([]); }}>
                 <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  {mockClients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {clients.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -171,7 +290,7 @@ export default function GenerateInvoiceTab() {
               <Select value={selectedProject} onValueChange={(v) => { setSelectedProject(v); setSelectedSubprojects([]); }} disabled={!selectedClient}>
                 <SelectTrigger className={`bg-secondary/30 ${!selectedClient ? "opacity-50" : ""}`}><SelectValue placeholder={selectedClient ? "Select project" : "Select client first"} /></SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  {projects.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -194,12 +313,12 @@ export default function GenerateInvoiceTab() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {subprojects.map((sp) => {
-                      const selected = selectedSubprojects.includes(sp.id);
+                      const selected = selectedSubprojects.includes(String(sp.id));
                       return (
                         <button
                           key={sp.id}
                           type="button"
-                          onClick={() => toggleSubproject(sp.id)}
+                          onClick={() => toggleSubproject(String(sp.id))}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                             selected
                               ? "bg-primary text-primary-foreground border-primary"
@@ -223,7 +342,7 @@ export default function GenerateInvoiceTab() {
                 <SelectTrigger className="bg-secondary/30"><SelectValue placeholder="All states" /></SelectTrigger>
                 <SelectContent className="bg-popover border-border">
                   <SelectItem value="all">All States</SelectItem>
-                  {mockStates.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -327,17 +446,17 @@ export default function GenerateInvoiceTab() {
                 <Label className="text-[10px] text-muted-foreground">Subproject</Label>
                 <Select value={rentSubproject} onValueChange={setRentSubproject}>
                   <SelectTrigger className="h-8 text-xs bg-secondary/30">
-                    <SelectValue placeholder={selectedSubprojects.length > 0 ? "Auto-populated" : "Select subproject"} />
+                    <SelectValue placeholder={subprojects.length > 0 ? "Select subproject" : "Select project first"} />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
-                    {(selectedProject ? mockSubprojects[selectedProject] || [] : []).map((sp) => (
-                      <SelectItem key={sp.id} value={sp.id}>{sp.name}</SelectItem>
+                    {subprojects.map((sp) => (
+                      <SelectItem key={sp.id} value={String(sp.id)}>{sp.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" size="sm" className="w-full">
-                <Download className="w-3.5 h-3.5 mr-1.5" /> Download Rent Report
+              <Button variant="outline" size="sm" className="w-full" onClick={handleDownloadRentReport} disabled={isDownloadingRent || !rentSubproject || !rentFrom || !rentTo}>
+                {isDownloadingRent ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Generating...</> : <><Download className="w-3.5 h-3.5 mr-1.5" /> Download Rent Report</>}
               </Button>
             </div>
 
@@ -358,7 +477,14 @@ export default function GenerateInvoiceTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockReconciliation.map((r) => {
+                    {reconciliation.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-6">
+                          Select a subproject to view reconciliation data
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {reconciliation.map((r) => {
                       const isFuture = r.status === "Future";
                       return (
                         <TableRow key={r.month} className={`border-border/50 ${isFuture ? "opacity-40" : "hover:bg-muted/50"}`}>

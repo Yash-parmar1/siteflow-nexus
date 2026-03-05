@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { CreateInvoiceDialog } from "@/components/forms/CreateInvoiceDialog";
+import FinancialImportDialog from "@/components/finance/FinancialImportDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +110,7 @@ export default function Finance() {
   const { toast } = useToast();
   const { data: appData } = useAppData();
   const [showCreateInvoiceDialog, setShowCreateInvoiceDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [txSearch, setTxSearch] = useState("");
   const [txStatusFilter, setTxStatusFilter] = useState("all");
   const [txDirectionFilter, setTxDirectionFilter] = useState("all");
@@ -163,7 +165,7 @@ export default function Finance() {
   }, [filteredMaterials]);
 
   const handleExport = () => toast({ title: "Export started", description: "Downloading finance data..." });
-  const handleImport = () => toast({ title: "Import", description: "Upload file to import transactions." });
+  const handleImport = () => setShowImportDialog(true);
   const handleCsvExport = (name: string) => toast({ title: "CSV Export", description: `Downloading ${name}.csv` });
 
   return (
@@ -599,6 +601,7 @@ export default function Finance() {
       </Tabs>
 
       <CreateInvoiceDialog open={showCreateInvoiceDialog} onOpenChange={setShowCreateInvoiceDialog} />
+      <FinancialImportDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
     </div>
   );
 }

@@ -19,8 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Lock, IndianRupee, Calendar, Wrench, Upload, FileText, Image, File, X,
-  Percent, Package, ShoppingCart, Tag, Pencil, Loader2, FileSpreadsheet,
+  Percent, Package, ShoppingCart, Tag, Pencil, Loader2, FileSpreadsheet, Download,
 } from "lucide-react";
+import api from "@/lib/api";
 
 // ── Schema ──────────────────────────────────────────────────────
 const subprojectSchema = z.object({
@@ -53,7 +54,7 @@ interface AddSubprojectDialogProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   projectName: string;
-  onSubmit?: (data: SubprojectFormData) => void;
+  onSubmit?: (data: SubprojectFormData, configFiles: { sellPrice?: File; costPrice?: File; assetValue?: File; rentSchedule?: File }) => void;
   onFilesChange?: (files: File[]) => void;
 }
 
@@ -129,12 +130,14 @@ function RequiredPdfDropzone({ label, file, onFile, onRemove }: {
 }
 
 // ── Locked Section (file-upload → auto-fill) ────────────────────
-function LockedFieldSection({ title, icon: Icon, fields, fileLabel, onProcess }: {
+function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, sampleFilename, onFileSelected }: {
   title: string;
   icon: React.ElementType;
   fields: { label: string; name: string; value: number | undefined; onChange: (v: number) => void }[];
   fileLabel: string;
-  onProcess?: () => void;
+  sampleUrl?: string;
+  sampleFilename?: string;
+  onFileSelected?: (file: File | null) => void;
 }) {
   const [locked, setLocked] = useState(true);
   const [uploadedFile, setUploadedFile] = useState<FileWithPreview | null>(null);
@@ -145,26 +148,52 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, onProcess }:
   const handleProcess = async () => {
     if (!uploadedFile) return;
     setProcessing(true);
-    // Simulate parsing file
-    await new Promise((r) => setTimeout(r, 1200));
-    fields.forEach((f) => f.onChange(Math.round(Math.random() * 50000 + 5000)));
+    // Simulate parsing file — actual upload happens after subproject creation
+    await new Promise((r) => setTimeout(r, 800));
     setProcessing(false);
-    toast.success(`${title} fields auto-filled from file`);
+    toast.success(`${title} file ready — will be processed on submit`);
   };
 
   const addFile = (f: File) => {
-    setUploadedFile({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file: f });
+    const fwp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file: f };
+    setUploadedFile(fwp);
+    onFileSelected?.(f);
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
+    onFileSelected?.(null);
+  };
+
+  const handleDownloadSample = async () => {
+    if (!sampleUrl) return;
+    try {
+      const res = await api.get(sampleUrl, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = sampleFilename || 'sample.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error('Failed to download sample file'); }
   };
 
   return (
     <div className="space-y-3">
       {/* File upload area */}
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground font-medium">{fileLabel}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground font-medium">{fileLabel}</p>
+          {sampleUrl && (
+            <button type="button" onClick={handleDownloadSample} className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+              <Download className="w-3 h-3" /> Download sample
+            </button>
+          )}
+        </div>
         {uploadedFile ? (
           <div className="flex items-center gap-2 flex-wrap">
-            <FileChip file={uploadedFile} onRemove={() => setUploadedFile(null)} />
-            <Button type="button" size="sm" variant="outline" onClick={() => { setUploadedFile(null); fileRef.current?.click(); }} className="h-7 text-xs">
+            <FileChip file={uploadedFile} onRemove={removeFile} />
+            <Button type="button" size="sm" variant="outline" onClick={() => { removeFile(); fileRef.current?.click(); }} className="h-7 text-xs">
               Replace
             </Button>
             <Button type="button" size="sm" onClick={handleProcess} disabled={processing} className="h-7 text-xs">
@@ -227,6 +256,11 @@ export function AddSubprojectDialog({
   const [visitedSections, setVisitedSections] = useState<Set<string>>(new Set());
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
+  // Config files for upload after creation
+  const [configFiles, setConfigFiles] = useState<{
+    sellPrice?: File; costPrice?: File; assetValue?: File; rentSchedule?: File;
+  }>({});
+
   // Required PDF files
   const [contractPdf, setContractPdf] = useState<FileWithPreview | null>(null);
   const [poPdf, setPoPdf] = useState<FileWithPreview | null>(null);
@@ -284,9 +318,10 @@ export function AddSubprojectDialog({
   const handleSubmit = async (data: SubprojectFormData) => {
     setIsSubmitting(true);
     try {
-      onSubmit?.(data);
+      onSubmit?.(data, configFiles);
       toast.success("Subproject created with locked configuration");
       form.reset();
+      setConfigFiles({});
       onOpenChange(false);
     } catch {
       toast.error("Failed to create subproject");
@@ -451,6 +486,9 @@ export function AddSubprojectDialog({
                       title="Asset Cost"
                       icon={Package}
                       fileLabel="Upload asset cost sheet (.xlsx / .csv)"
+                      sampleUrl="/samples/asset-value"
+                      sampleFilename="sample_asset_value.csv"
+                      onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, assetValue: f || undefined }))}
                       fields={[
                         { label: "Unit Cost (₹)", name: "assetUnitCost", value: form.watch("assetUnitCost"), onChange: (v) => form.setValue("assetUnitCost", v) },
                         { label: "Installation Cost (₹)", name: "assetInstallationCost", value: form.watch("assetInstallationCost"), onChange: (v) => form.setValue("assetInstallationCost", v) },
@@ -475,6 +513,9 @@ export function AddSubprojectDialog({
                       title="Extra Material Cost"
                       icon={ShoppingCart}
                       fileLabel="Upload material cost file"
+                      sampleUrl="/samples/cost-price"
+                      sampleFilename="sample_cost_price.csv"
+                      onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, costPrice: f || undefined }))}
                       fields={[
                         { label: "Material Cost Price (₹)", name: "extraMaterialCostPrice", value: form.watch("extraMaterialCostPrice"), onChange: (v) => form.setValue("extraMaterialCostPrice", v) },
                       ]}
@@ -496,6 +537,9 @@ export function AddSubprojectDialog({
                       title="Extra Material Sell"
                       icon={Tag}
                       fileLabel="Upload sell price / RC file"
+                      sampleUrl="/samples/sell-price"
+                      sampleFilename="sample_sell_price.csv"
+                      onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, sellPrice: f || undefined }))}
                       fields={[
                         { label: "Sell Price (₹)", name: "extraMaterialSellPrice", value: form.watch("extraMaterialSellPrice"), onChange: (v) => form.setValue("extraMaterialSellPrice", v) },
                         { label: "RC Amount (₹)", name: "extraMaterialRC", value: form.watch("extraMaterialRC"), onChange: (v) => form.setValue("extraMaterialRC", v) },

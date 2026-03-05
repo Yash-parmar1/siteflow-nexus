@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { AddProjectDialog } from "@/components/forms/AddProjectDialog";
 import { AddSubprojectDialog } from "@/components/forms/AddSubprojectDialog";
 import api from "@/lib/api";
-import UploadSitesDialog from "@/components/sites/UploadSitesDialog";
+import AddFilesDialog from "@/components/sites/AddFilesDialog";
 import UploadResultDialog from "@/components/sites/UploadResultDialog";
 import ViewImportsDialog from "@/components/sites/ViewImportsDialog";
 import { toast } from "sonner";
@@ -688,7 +688,7 @@ export default function Projects() {
                                   )}
                                 </div>
                                 <div className="flex gap-2 items-center">
-                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Sites</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setUploadOpen(true); }} className="text-sm text-primary hover:underline">Add Files</button>
                                   <button onClick={(e) => { e.stopPropagation(); setActiveProjectId(project.id); setActiveSubprojectId(subproject.id); setImportViewOpen(true); }} className="text-sm text-muted-foreground hover:underline">View Imports</button>
                                 </div>
                               </div>
@@ -763,7 +763,7 @@ export default function Projects() {
 
       
       {/* Import dialogs */}
-      <UploadSitesDialog open={uploadOpen} onOpenChange={setUploadOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onUploaded={(res) => { setLastSessionId(res.sessionId); setResultOpen(true); }} />
+      <AddFilesDialog open={uploadOpen} onOpenChange={setUploadOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} onUploaded={(res) => { if (res?.sessionId) { setLastSessionId(res.sessionId); setResultOpen(true); } fetchProjects(); }} />
 
       <UploadResultDialog open={resultOpen} onOpenChange={setResultOpen} projectId={activeProjectId ?? ''} subprojectId={activeSubprojectId ?? ''} sessionId={lastSessionId} onProcessed={() => { setResultOpen(false); setImportViewOpen(false); fetchProjects(); }} />
 
@@ -776,22 +776,44 @@ export default function Projects() {
           projectId={selectedProjectForSubproject.id}
           projectName={selectedProjectForSubproject.name}
           onFilesChange={(files) => setPendingSubprojectFiles(files)}
-          onSubmit={async (data) => {
+          onSubmit={async (data, configFiles) => {
             try {
               const res = await api.post(`/projects/${selectedProjectForSubproject.id}/subprojects`, data);
               const createdSubId = res.data && res.data.id;
 
-              // Upload attachments if any
-              if (createdSubId && pendingSubprojectFiles.length > 0) {
-                try {
-                  const formData = new FormData();
-                  pendingSubprojectFiles.forEach(f => formData.append('files', f));
-                  formData.append('entityType', 'SUBPROJECT');
-                  formData.append('entityId', String(createdSubId));
-                  await api.post('/documents/upload', formData);
-                  setPendingSubprojectFiles([]);
-                } catch (uploadErr) {
-                  toast.error('Subproject created but file upload failed');
+              if (createdSubId) {
+                // Upload config files to SubprojectConfigController endpoints
+                const configUploads: { key: string; file: File | undefined; endpoint: string }[] = [
+                  { key: 'sellPrice', file: configFiles?.sellPrice, endpoint: `/subproject/${createdSubId}/config/sell-price` },
+                  { key: 'costPrice', file: configFiles?.costPrice, endpoint: `/subproject/${createdSubId}/config/cost-price` },
+                  { key: 'assetValue', file: configFiles?.assetValue, endpoint: `/subproject/${createdSubId}/config/asset-values` },
+                  { key: 'rentSchedule', file: configFiles?.rentSchedule, endpoint: `/subproject/${createdSubId}/config/rent-schedule` },
+                ];
+
+                for (const cfg of configUploads) {
+                  if (cfg.file) {
+                    try {
+                      const fd = new FormData();
+                      fd.append('file', cfg.file);
+                      await api.post(cfg.endpoint, fd);
+                    } catch (cfgErr) {
+                      toast.error(`Config upload failed: ${cfg.key}`);
+                    }
+                  }
+                }
+
+                // Upload attachments if any
+                if (pendingSubprojectFiles.length > 0) {
+                  try {
+                    const formData = new FormData();
+                    pendingSubprojectFiles.forEach(f => formData.append('files', f));
+                    formData.append('entityType', 'SUBPROJECT');
+                    formData.append('entityId', String(createdSubId));
+                    await api.post('/documents/upload', formData);
+                    setPendingSubprojectFiles([]);
+                  } catch (uploadErr) {
+                    toast.error('Subproject created but file upload failed');
+                  }
                 }
               }
 
