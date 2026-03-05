@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText, Download } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -118,10 +118,33 @@ export default function UploadSitesDialog({ open, onOpenChange, projectId, subpr
             </div>
           )}
 
-          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            {mode === 'assets'
-              ? 'CSV/Excel must follow the Asset Detail format. Rows will be validated and assets created.'
-              : 'The file will be parsed and a summary shown. Only failed/warning rows will be stored for edits.'}
+          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg space-y-2">
+            <p>
+              {mode === 'assets'
+                ? 'CSV/Excel must follow the Asset Detail format. Rows will be validated and assets created.'
+                : 'The file will be parsed and a summary shown. Only failed/warning rows will be stored for edits.'}
+            </p>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs text-primary"
+              onClick={async () => {
+                try {
+                  const endpoint = mode === 'assets' ? '/samples/assets' : '/samples/sites';
+                  const res = await api.get(endpoint, { responseType: 'blob' });
+                  const url = URL.createObjectURL(res.data);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = mode === 'assets' ? 'sample_assets.csv' : 'sample_sites.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch { toast.error('Failed to download sample file'); }
+              }}
+            >
+              <Download className="w-3 h-3 mr-1" />
+              Download sample {mode === 'assets' ? 'assets' : 'sites'} file
+            </Button>
           </div>
         </div>
 
