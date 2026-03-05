@@ -450,7 +450,7 @@ export function ImportInstallationsDialog({
               )}
 
               {/* Expected format hint */}
-              <div className="bg-secondary/50 rounded-lg p-4 text-sm space-y-1">
+              <div className="bg-secondary/50 rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium text-foreground flex items-center gap-1.5">
                   <FileText className="w-4 h-4" /> Expected File Format
                 </p>
@@ -459,6 +459,24 @@ export function ImportInstallationsDialog({
                   Booking ID, Around Item ID, Booking Date, Closed Date, Status,
                   Spare Involved, OTP Verified, Rating, Serial Image URL, Evidence URLs…
                 </p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/samples/installations', { responseType: 'blob' });
+                      const url = URL.createObjectURL(res.data);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'sample_installations.csv';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch { toast.error('Failed to download sample file'); }
+                  }}
+                >
+                  <Download className="w-3 h-3" />
+                  Download sample file
+                </button>
               </div>
             </div>
 
