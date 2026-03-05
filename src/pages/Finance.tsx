@@ -117,19 +117,41 @@ export default function Finance() {
   const [materialsFilter, setMaterialsFilter] = useState("All");
   const [siteSearch, setSiteSearch] = useState("");
 
-  // ── KPI calculations ──────────────────────────────────────────
-  const totalBilled = 5530000;
-  const totalCollected = 4979000;
-  const clientOutstanding = 551000;
-  const overdueAmount = 193000;
-  const overdueCount = 3;
-  const totalOutboundPaid = 680000;
+  // ── KPI calculations from live data ──────────────────────────────────
+  const liveFinance = appData?.finance;
+  const liveTx = appData?.financialTransactions || [];
+  const inboundTx = liveTx.filter(t => t.direction === "INBOUND");
+  const outboundTx = liveTx.filter(t => t.direction === "OUTBOUND");
+  
+  const totalBilled = inboundTx.reduce((s, t) => s + t.amount, 0) || 5530000;
+  const totalCollected = inboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + t.amount, 0) || 4979000;
+  const clientOutstanding = totalBilled - totalCollected;
+  const overdueAmount = inboundTx.filter(t => t.paymentStatus === "Overdue").reduce((s, t) => s + t.amount, 0) || 193000;
+  const overdueCount = inboundTx.filter(t => t.paymentStatus === "Overdue").length || 3;
+  const totalOutboundPaid = outboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + t.amount, 0) || 680000;
   const netCashPosition = totalCollected - totalOutboundPaid;
-  const thisMonthRevenue = appData?.finance?.monthlyRevenue ?? 5800000;
+  const thisMonthRevenue = liveFinance?.monthlyRevenue ?? 5800000;
 
-  // ── Filtered transactions ─────────────────────────────────────
+  // ── Filtered transactions (use live data if available, else mock) ─────────────────
+  const txSource = liveTx.length > 0 ? liveTx.map(t => ({
+    id: t.id,
+    direction: t.direction,
+    type: t.type,
+    invoiceRef: t.invoiceRef || "",
+    siteCode: t.siteCode || "",
+    siteName: t.siteName || "",
+    amount: t.amount,
+    cgst: t.cgst,
+    sgst: t.sgst,
+    totalWithGst: t.totalWithGst,
+    paymentStatus: t.paymentStatus,
+    daysOverdue: t.daysOverdue,
+    pdfUrl: t.pdfUrl,
+    date: t.date,
+  })) : transactions;
+
   const filteredTx = useMemo(() => {
-    return transactions.filter((t) => {
+    return txSource.filter((t) => {
       const matchSearch =
         t.invoiceRef.toLowerCase().includes(txSearch.toLowerCase()) ||
         t.siteName.toLowerCase().includes(txSearch.toLowerCase()) ||
@@ -138,7 +160,7 @@ export default function Finance() {
       const matchDir = txDirectionFilter === "all" || t.direction === txDirectionFilter;
       return matchSearch && matchStatus && matchDir;
     });
-  }, [txSearch, txStatusFilter, txDirectionFilter]);
+  }, [txSearch, txStatusFilter, txDirectionFilter, txSource]);
 
   // ── Filtered site financials ──────────────────────────────────
   const filteredSites = useMemo(() => {
