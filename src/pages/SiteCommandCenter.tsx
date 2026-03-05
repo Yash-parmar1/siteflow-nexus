@@ -9,12 +9,13 @@ import { FinanceSnapshot } from "@/components/sites/FinanceSnapshot";
 import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
 import { Info, Zap } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
+import { normalizeStage, computeProgress, STAGE_ORDER, stageIndex } from "@/lib/stageUtils";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function SiteCommandCenter() {
   const { siteId } = useParams();
-  const { data: appData, loading } = useAppData();
+  const { data: appData, loading, refresh } = useAppData();
   const navigate = useNavigate();
   const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
   const [evidenceData, setEvidenceData] = useState<{ photos: any[]; documents: any[]; title: string }>({ photos: [], documents: [], title: "" });
@@ -40,14 +41,18 @@ export default function SiteCommandCenter() {
     );
   }
 
+  const displayStage = normalizeStage(liveSite.currentStage);
+  const planned = liveSite.acsPlanned ?? liveSite.plannedAcsCount ?? 0;
+  const installed = liveSite.acsInstalled ?? 0;
+
   const site = {
     id: String(liveSite.id),
     name: liveSite.name,
     location: liveSite.location ?? "",
-    stage: liveSite.stage ?? "WIP",
-    progress: liveSite.progress ?? 0,
-    acsPlanned: liveSite.acsPlanned ?? 0,
-    acsInstalled: liveSite.acsInstalled ?? 0,
+    stage: displayStage,
+    progress: computeProgress(liveSite.progress ?? 0, displayStage, planned, installed),
+    acsPlanned: planned,
+    acsInstalled: installed,
     hasDelay: liveSite.hasDelay ?? false,
     delayDays: liveSite.delayDays ?? 0,
     projectId: liveSite.projectId ? String(liveSite.projectId) : "",
@@ -131,15 +136,28 @@ export default function SiteCommandCenter() {
         profitMargin: 0,
       };
 
-  // Build timeline events from site stage
-  const stageOrder = ["Started", "WTS", "WIP", "TIS", "Installed", "Live"];
-  const currentIdx = stageOrder.indexOf(site.stage);
-  const timelineEvents = stageOrder.map((stage, i) => ({
-    id: String(i + 1),
-    stage,
-    status: (i < currentIdx ? "completed" : i === currentIdx ? "current" : "upcoming") as "completed" | "current" | "upcoming",
-    date: i <= currentIdx ? undefined : undefined,
-  }));
+  // Build timeline events from site stage — use real dates from liveSite fields
+  const stageFieldMap: Record<string, { dateField: keyof typeof liveSite; notes: string }> = {
+    Started:   { dateField: "createdAt",             notes: "Project started and site registered." },
+    WTS:       { dateField: "stabilizerOrderDate",    notes: "Stabilizer ordered / work to start." },
+    WIP:       { dateField: "acOrderedDate",          notes: "AC ordered, work in progress." },
+    TIS:       { dateField: "installationScheduled",  notes: "Installation scheduled for testing." },
+    Installed: { dateField: "installationDone",       notes: "Installation completed." },
+    Live:      { dateField: "actualLiveDate",         notes: "Site is live and operational." },
+  };
+  const currentIdx = stageIndex(displayStage);
+  const fmtDate = (v: any) => { if (!v) return undefined; try { return new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return undefined; } };
+  const timelineEvents = STAGE_ORDER.map((stage, i) => {
+    const info = stageFieldMap[stage];
+    const dateVal = info?.dateField ? (liveSite as any)[info.dateField] : null;
+    return {
+      id: String(i + 1),
+      stage,
+      status: (i < currentIdx ? "completed" : i === currentIdx ? "current" : "upcoming") as "completed" | "current" | "upcoming",
+      date: fmtDate(dateVal),
+      notes: i <= currentIdx ? info?.notes : undefined,
+    };
+  });
 
   // Calculate aggregate contract stats
   const activeContracts = acsUnits.filter(u => u.contractStatus === "active").length;
@@ -148,7 +166,7 @@ export default function SiteCommandCenter() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader site={site} />
+      <SiteHeader site={site} onRefresh={refresh} />
 
       <div className="p-6 animate-fade-in">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

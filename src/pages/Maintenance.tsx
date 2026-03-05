@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Plus, Wrench, AlertCircle, Clock, MapPin, MessageSquare, Paperclip, Calendar } from "lucide-react";
+import { Search, Plus, Wrench, AlertCircle, Clock, MapPin, MessageSquare, Paperclip, Calendar, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppData, type TicketData } from "@/context/AppDataContext";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 const statusConfig: Record<string, { color: string; bgColor: string }> = { Open: { color: "text-[hsl(var(--status-info))]", bgColor: "bg-[hsl(var(--status-info)/0.15)]" }, "In Progress": { color: "text-[hsl(var(--status-warning))]", bgColor: "bg-[hsl(var(--status-warning)/0.15)]" }, "Pending Parts": { color: "text-muted-foreground", bgColor: "bg-muted" }, Resolved: { color: "text-[hsl(var(--status-success))]", bgColor: "bg-[hsl(var(--status-success)/0.15)]" } };
 const priorityConfig: Record<string, { dot: string }> = { Critical: { dot: "bg-[hsl(var(--status-error))]" }, High: { dot: "bg-[hsl(var(--status-warning))]" }, Medium: { dot: "bg-[hsl(var(--status-info))]" }, Low: { dot: "bg-muted-foreground" } };
@@ -54,6 +56,30 @@ export default function Maintenance() {
 
   const kanbanStatuses = ["Open", "In Progress", "Pending Parts", "Resolved"];
 
+  const handleExport = () => {
+    const rows = (appData?.maintenanceTickets || []).map((t: TicketData) => ({
+      "Ticket ID": t.id ?? "",
+      "Title": t.title ?? "",
+      "Description": t.description ?? "",
+      "Site": t.siteName ?? "",
+      "Site ID": t.siteId ?? "",
+      "AC Asset Serial": t.acAssetSerial ?? "",
+      "AC Asset ID": t.acAssetId ?? "",
+      "Priority": t.priority ?? "",
+      "Status": t.status ?? "",
+      "Assigned To": t.assignedTo ?? "",
+      "Visiting Charge": t.visitingCharge ?? "",
+      "Created At": t.createdAt ?? "",
+      "Updated At": t.updatedAt ?? "",
+      "Closed At": t.closedAt ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Maintenance Tickets");
+    XLSX.writeFile(wb, `maintenance_tickets_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${rows.length} tickets`);
+  };
+
   const TicketCard = ({ ticket, compact = false }: { ticket: typeof tickets[0]; compact?: boolean }) => (
     <Card className={`data-card cursor-pointer ${compact ? "p-3" : ""}`} onClick={() => navigate(`/site/${ticket.siteId}`)}>
       <CardContent className={compact ? "p-0" : "p-4"}>
@@ -71,6 +97,7 @@ export default function Maintenance() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div><h1 className="text-2xl font-semibold text-foreground">Maintenance & Tickets</h1><p className="text-sm text-muted-foreground mt-0.5">Manage service requests and maintenance tasks</p></div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}><Download className="w-4 h-4" />Export</Button>
           <Button variant="outline" onClick={() => setShowScheduleMaintenanceDialog(true)}><Calendar className="w-4 h-4" />Schedule</Button>
           <Button size="default" onClick={() => setShowCreateTicketDialog(true)}><Plus className="w-4 h-4" />Create Ticket</Button>
         </div>

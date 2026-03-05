@@ -20,6 +20,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AddUnitDialog } from "@/components/forms/AddUnitDialog";
 import { EditAssetDialog } from "@/components/forms/EditAssetDialog";
 import { useAppData, type AssetData } from "@/context/AppDataContext";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   Operational: { color: "status-success", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
@@ -84,6 +86,35 @@ export default function Assets() {
     setEditAssetOpen(true);
   };
 
+  const handleExport = () => {
+    const rows = (appData?.assets || []).map((a: AssetData) => ({
+      "Serial Number": a.serialNumber ?? "",
+      "Manufacturer": a.manufacturer ?? "",
+      "Model": a.model ?? "",
+      "Model Number": a.modelNumber ?? "",
+      "Size (Ton)": a.sizeInTon ?? "",
+      "Type": a.indoorAc ? "Indoor" : "Outdoor",
+      "Site": a.siteName ?? "",
+      "Project": a.projectName ?? "",
+      "Subproject": a.subprojectName ?? "",
+      "Location In Site": a.locationInSite ?? "",
+      "Status": a.status ?? "",
+      "Monthly Rent": a.monthlyRent ?? "",
+      "First Month Rent": a.firstMonthRent ?? "",
+      "Purchase Cost": a.purchaseCost ?? "",
+      "Warranty Expiry": a.warrantyExpiryDate ?? "",
+      "Next Maintenance": a.nextMaintenanceDate ?? "",
+      "Last Maintenance": a.lastMaintenanceDate ?? "",
+      "Insurance Threshold": a.insuranceThreshold ?? "",
+      "Maintenance Supported": a.maintenanceSupported ? "Yes" : "No",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Assets");
+    XLSX.writeFile(wb, `assets_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${rows.length} assets`);
+  };
+
   return (
     <div className="p-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -92,7 +123,7 @@ export default function Assets() {
           <p className="text-sm text-muted-foreground mt-0.5">{totalUnits} units across all sites</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="default"><Download className="w-4 h-4" />Export</Button>
+          <Button variant="outline" size="default" onClick={handleExport}><Download className="w-4 h-4" />Export</Button>
           <Button size="default" onClick={() => setAddUnitOpen(true)}><Plus className="w-4 h-4" />Add Unit</Button>
         </div>
       </div>
@@ -143,7 +174,7 @@ export default function Assets() {
             <TableBody>
               {filteredUnits.map((unit) => (
                 <TableRow key={unit.id} className="cursor-pointer hover:bg-muted/50 border-border/50" onClick={() => navigate(`/assets/${unit.id}`)}>
-                  <TableCell className="font-medium">{unit.serialNumber}</TableCell>
+                  <TableCell className="font-medium font-mono text-xs" title={unit.serialNumber}>{unit.serialNumber.length > 20 ? `${unit.serialNumber.slice(0, 10)}...${unit.serialNumber.slice(-6)}` : unit.serialNumber}</TableCell>
                   <TableCell>{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</TableCell>
                   <TableCell><Badge variant="outline" className={unit.isIndoor ? 'border-[hsl(var(--status-info))] text-[hsl(var(--status-info))]' : 'border-[hsl(var(--status-warning))] text-[hsl(var(--status-warning))]'}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</Badge></TableCell>
                   <TableCell><div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />{unit.siteName}</div></TableCell>
@@ -174,18 +205,54 @@ export default function Assets() {
             <Card key={unit.id} className="data-card cursor-pointer" onClick={() => navigate(`/assets/${unit.id}`)}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-semibold text-foreground">{unit.serialNumber}</p>
-                    <p className="text-xs text-muted-foreground">{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</p>
-                    <Badge variant="outline" className={`mt-1 text-[10px] h-4 ${unit.isIndoor ? 'border-[hsl(var(--status-info))] text-[hsl(var(--status-info))]' : 'border-[hsl(var(--status-warning))] text-[hsl(var(--status-warning))]'}`}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</Badge>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-lg shrink-0 ${
+                      unit.status === 'Operational' ? 'bg-[hsl(var(--status-success)/0.15)]' :
+                      unit.status === 'Faulty' ? 'bg-[hsl(var(--status-error)/0.15)]' :
+                      unit.status === 'Under Maintenance' ? 'bg-[hsl(var(--status-warning)/0.15)]' :
+                      'bg-muted'
+                    }`}>
+                      <Box className={`w-5 h-5 ${
+                        unit.status === 'Operational' ? 'text-[hsl(var(--status-success))]' :
+                        unit.status === 'Faulty' ? 'text-[hsl(var(--status-error))]' :
+                        unit.status === 'Under Maintenance' ? 'text-[hsl(var(--status-warning))]' :
+                        'text-muted-foreground'
+                      }`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground truncate" title={unit.serialNumber}>
+                        {unit.serialNumber.length > 18 ? `${unit.serialNumber.slice(0, 8)}...${unit.serialNumber.slice(-6)}` : unit.serialNumber}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-muted-foreground">{unit.model || 'N/A'}{unit.sizeInTon ? ` · ${unit.sizeInTon}T` : ''}</span>
+                        <Badge variant="outline" className={`text-[9px] h-4 px-1 ${unit.isIndoor ? 'border-[hsl(var(--status-info))] text-[hsl(var(--status-info))]' : 'border-[hsl(var(--status-warning))] text-[hsl(var(--status-warning))]'}`}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</Badge>
+                      </div>
+                    </div>
                   </div>
-                  <span className={`status-badge ${statusConfig[unit.status]?.color}`}>{statusConfig[unit.status]?.icon}{unit.status}</span>
+                  <span className={`status-badge shrink-0 ${statusConfig[unit.status]?.color}`}>{statusConfig[unit.status]?.icon}{unit.status}</span>
                 </div>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{unit.siteName}</div>
-                  <div className="flex items-center gap-1.5">₹{unit.configuredRent.toLocaleString("en-IN")}/mo</div>
+
+                <div className="space-y-1.5 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{unit.siteName}</span></div>
+                  {unit.location && <div className="flex items-center gap-1.5 text-xs"><FolderKanban className="w-3 h-3 shrink-0" /><span className="truncate">{unit.location}</span></div>}
                 </div>
-                <div className="mt-3 pt-3 border-t border-border/50 flex justify-end">
+
+                <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Rent</p>
+                    <p className="font-medium text-foreground">₹{unit.configuredRent.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Warranty</p>
+                    <p className="font-medium text-foreground">{unit.warrantyExpiry !== '-' ? new Date(unit.warrantyExpiry).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }) : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Next Maint.</p>
+                    <p className="font-medium text-foreground">{unit.nextMaintenance !== '-' ? new Date(unit.nextMaintenance).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }) : '-'}</p>
+                  </div>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-border/50 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditAsset(unit.id, unit.serialNumber); }}><Pencil className="w-3.5 h-3.5 mr-1" />Edit</Button>
                 </div>
               </CardContent>

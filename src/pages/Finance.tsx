@@ -14,10 +14,12 @@ import {
   Clock, Wallet, IndianRupee, AlertTriangle, FileText, ExternalLink, Filter,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAppData } from "@/context/AppDataContext";
+import { useAppData, type FinancialTransaction } from "@/context/AppDataContext";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Tooltip } from "recharts";
 import { Separator } from "@/components/ui/separator";
 import GenerateInvoiceTab from "@/components/finance/GenerateInvoiceTab";
+import { toast as sonnerToast } from "sonner";
+import * as XLSX from "xlsx";
 
 // ── Status configs ───────────────────────────────────────────────
 const paymentStatusConfig: Record<string, { class: string }> = {
@@ -124,13 +126,13 @@ export default function Finance() {
   }, [inboundTx]);
 
   const overdueDetails = useMemo(() => {
-    return inboundTx.filter(t => t.daysOverdue > 0).map(t => ({
+    return inboundTx.filter(t => (t.daysOverdue ?? 0) > 0).map(t => ({
       invoiceRef: t.invoiceRef || '',
       site: `${t.siteCode || ''} – ${t.siteName || ''}`,
       client: t.siteName || '',
-      amount: t.amount,
+      amount: t.amount ?? 0,
       dueDate: t.date || '',
-      daysOverdue: t.daysOverdue,
+      daysOverdue: t.daysOverdue ?? 0,
       bucket: t.daysOverdue <= 30 ? '1–30 days' : t.daysOverdue <= 60 ? '31–60 days' : t.daysOverdue <= 90 ? '61–90 days' : '90+ days',
     }));
   }, [inboundTx]);
@@ -197,9 +199,36 @@ export default function Finance() {
   const filteredMaterials: any[] = [];
   const materialTotals: Record<string, number> = {};
 
-  const handleExport = () => toast({ title: "Export started", description: "Downloading finance data..." });
+  const handleExport = () => {
+    const txns = appData?.financialTransactions ?? [];
+    if (!txns.length) { sonnerToast.warning("No financial data to export"); return; }
+    const rows = txns.map((t: FinancialTransaction) => ({
+      "Direction": t.direction ?? "",
+      "Type": t.type ?? "",
+      "Invoice Ref": t.invoiceRef ?? "",
+      "Site Code": t.siteCode ?? "",
+      "Site Name": t.siteName ?? "",
+      "Amount": t.amount ?? 0,
+      "CGST": t.cgst ?? 0,
+      "SGST": t.sgst ?? 0,
+      "Total With GST": t.totalWithGst ?? 0,
+      "Payment Status": t.paymentStatus ?? "",
+      "Days Overdue": t.daysOverdue ?? 0,
+      "Date": t.date ?? "",
+      "PDF URL": t.pdfUrl ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = rows.length ? Object.keys(rows[0]).map(() => ({ wch: 18 })) : [];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Financial Transactions");
+    XLSX.writeFile(wb, `Finance_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    sonnerToast.success(`Exported ${rows.length} transactions`);
+  };
   const handleImport = () => setShowImportDialog(true);
-  const handleCsvExport = (name: string) => toast({ title: "CSV Export", description: `Downloading ${name}.csv` });
+  const handleCsvExport = (name: string) => {
+    // Re-use the main export with a sheet named after the report
+    handleExport();
+  };
 
   return (
     <div className="p-6 animate-fade-in">

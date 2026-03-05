@@ -90,8 +90,10 @@ export function ACSContractCard({ unit, onClick }: ACSContractCardProps) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-foreground">{unit.serialNumber}</span>
-              {unit.hasIssue && <AlertCircle className="w-4 h-4 text-status-error" />}
+              <span className="font-semibold text-foreground truncate max-w-[180px]" title={unit.serialNumber}>
+                {unit.serialNumber.length > 16 ? `${unit.serialNumber.slice(0, 8)}...${unit.serialNumber.slice(-5)}` : unit.serialNumber}
+              </span>
+              {unit.hasIssue && <AlertCircle className="w-4 h-4 text-status-error shrink-0" />}
             </div>
             <span className="text-xs text-muted-foreground">{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</span>
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${unit.isIndoor ? 'bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))]' : 'bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]'}`}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</span>

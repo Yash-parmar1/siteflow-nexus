@@ -191,15 +191,26 @@ export default function GenerateInvoiceTab() {
         billingMonth: formattedMonth,
       }, { responseType: 'blob' });
 
-      // Download the file
-      const url = URL.createObjectURL(new Blob([res.data]));
+      // Check if the response is an error message (small JSON response)
+      const blob = new Blob([res.data]);
+      if (blob.size < 2000) {
+        // Might be a "No Data" sheet only - warn user
+        toast({
+          title: "Invoice Generated - Possibly Empty",
+          description: "The file was generated but may contain only headers. Check that selected sites have unbilled installations, extra materials with sell prices configured, or closed maintenance tickets.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Invoice Generated", description: "Your .xlsx invoice has been downloaded" });
+      }
+
+      // Download the file regardless
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `Invoice_${formattedMonth}_${selectedCategories.join('-')}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-
-      toast({ title: "Invoice Generated", description: "Your .xlsx invoice has been downloaded" });
     } catch {
       toast({ title: "Error", description: "Failed to generate invoice", variant: "destructive" });
     } finally {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,46 +28,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { Wrench, MapPin, Box, User, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import api from "@/lib/api";
+import { useAppData } from "@/context/AppDataContext";
+import { Wrench, MapPin, Box, AlertCircle } from "lucide-react";
 
 const ticketSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   siteId: z.string().min(1, "Please select a site"),
-  unitId: z.string().optional(),
+  acAssetId: z.string().optional(),
   priority: z.string().min(1, "Please select a priority"),
-  assigneeId: z.string().optional(),
+  visitingCharge: z.number().min(0).optional(),
 });
 
 type TicketFormData = z.infer<typeof ticketSchema>;
 
-// Mock data
-const mockSites = [
-  { id: "site-001", name: "Metro Tower - Block A" },
-  { id: "site-002", name: "Phoenix Mall Expansion" },
-  { id: "site-003", name: "Cyber Hub Tower 5" },
-  { id: "site-004", name: "Prestige Tech Park" },
-  { id: "site-005", name: "DLF Cyber City Phase 3" },
-];
-
-const mockUnits = [
-  { id: "SN-2024-0001", name: "SN-2024-0001 (Floor 12)" },
-  { id: "SN-2024-0002", name: "SN-2024-0002 (Floor 15)" },
-  { id: "SN-2024-0003", name: "SN-2024-0003 (Floor 8)" },
-];
-
-const mockAssignees = [
-  { id: "USR-001", name: "Raj Kumar" },
-  { id: "USR-002", name: "Priya Singh" },
-  { id: "USR-003", name: "Amit Patel" },
-];
-
 const priorities = [
-  { value: "Critical", color: "bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))]" },
-  { value: "High", color: "bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]" },
-  { value: "Medium", color: "bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))]" },
-  { value: "Low", color: "bg-muted text-muted-foreground" },
+  { value: "CRITICAL", label: "Critical", color: "bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))]" },
+  { value: "HIGH", label: "High", color: "bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]" },
+  { value: "MEDIUM", label: "Medium", color: "bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))]" },
+  { value: "LOW", label: "Low", color: "bg-muted text-muted-foreground" },
 ];
 
 interface CreateTicketDialogProps {
@@ -78,8 +59,15 @@ interface CreateTicketDialogProps {
 }
 
 export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit }: CreateTicketDialogProps) {
-  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: appData, refresh } = useAppData();
+
+  const sites = useMemo(() => {
+    return (appData?.sites || []).map((s) => ({
+      id: String(s.id),
+      name: s.name,
+    }));
+  }, [appData?.sites]);
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -87,33 +75,49 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
       title: "",
       description: "",
       siteId: "",
-      unitId: "",
+      acAssetId: "",
       priority: "",
-      assigneeId: "",
+      visitingCharge: 0,
     },
   });
+
+  const selectedSiteId = form.watch("siteId");
+
+  // Filter assets belonging to selected site
+  const siteAssets = useMemo(() => {
+    if (!selectedSiteId) return [];
+    return (appData?.assets || [])
+      .filter((a) => String(a.siteId) === selectedSiteId)
+      .map((a) => ({
+        id: String(a.id),
+        serialNumber: a.serialNumber,
+        model: a.model || a.manufacturer || "Unknown",
+        locationInSite: a.locationInSite || "",
+      }));
+  }, [selectedSiteId, appData?.assets]);
 
   const handleSubmit = async (data: TicketFormData) => {
     setIsSubmitting(true);
     try {
-      // TODO: Integrate with backend
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const payload: Record<string, any> = {
+        title: data.title,
+        description: data.description,
+        siteId: Number(data.siteId),
+        acAssetId: data.acAssetId ? Number(data.acAssetId) : null,
+        priority: data.priority,
+        status: "RAISED",
+        visitingCharge: data.visitingCharge ?? 0,
+      };
 
-      const ticketId = `TKT-${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`;
-      
+      await api.post("/maintenance-history", payload);
       onSubmit?.(data);
-      toast({
-        title: "Ticket created",
-        description: `Ticket ${ticketId} has been created successfully.`,
-      });
+      toast.success("Ticket created successfully");
       form.reset();
+      await refresh();
       onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create ticket. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.response?.data || "Failed to create ticket";
+      toast.error(typeof msg === "string" ? msg : "Failed to create ticket");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,7 +143,7 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ticket Title</FormLabel>
+                  <FormLabel>Ticket Title *</FormLabel>
                   <FormControl>
                     <Input placeholder="Brief description of the issue" {...field} />
                   </FormControl>
@@ -153,7 +157,7 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>Description *</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Detailed description of the issue, symptoms, and any relevant observations..."
@@ -172,8 +176,14 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
                 name="siteId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Site</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Site *</FormLabel>
+                    <Select
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.setValue("acAssetId", "");
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger className="bg-secondary/50">
                           <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -181,7 +191,7 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-popover border-border">
-                        {mockSites.map((site) => (
+                        {sites.map((site) => (
                           <SelectItem key={site.id} value={site.id}>
                             {site.name}
                           </SelectItem>
@@ -195,21 +205,25 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
 
               <FormField
                 control={form.control}
-                name="unitId"
+                name="acAssetId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ACS Unit (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>AC Unit (Optional)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!selectedSiteId}
+                    >
                       <FormControl>
                         <SelectTrigger className="bg-secondary/50">
                           <Box className="w-4 h-4 mr-2 text-muted-foreground" />
-                          <SelectValue placeholder="Select unit" />
+                          <SelectValue placeholder={selectedSiteId ? "Select unit" : "Select site first"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-popover border-border">
-                        {mockUnits.map((unit) => (
-                          <SelectItem key={unit.id} value={unit.id}>
-                            {unit.name}
+                        {siteAssets.map((asset) => (
+                          <SelectItem key={asset.id} value={asset.id}>
+                            {asset.serialNumber}{asset.locationInSite ? ` (${asset.locationInSite})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -226,7 +240,7 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
                 name="priority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Priority</FormLabel>
+                    <FormLabel>Priority *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="bg-secondary/50">
@@ -239,7 +253,7 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
                           <SelectItem key={priority.value} value={priority.value}>
                             <div className="flex items-center gap-2">
                               <span className={`w-2 h-2 rounded-full ${priority.color.split(" ")[0]}`} />
-                              {priority.value}
+                              {priority.label}
                             </div>
                           </SelectItem>
                         ))}
@@ -252,25 +266,19 @@ export function CreateTicketDialog({ open, onOpenChange, initialStatus, onSubmit
 
               <FormField
                 control={form.control}
-                name="assigneeId"
+                name="visitingCharge"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Assign To (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="bg-secondary/50">
-                          <User className="w-4 h-4 mr-2 text-muted-foreground" />
-                          <SelectValue placeholder="Select assignee" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-popover border-border">
-                        {mockAssignees.map((assignee) => (
-                          <SelectItem key={assignee.id} value={assignee.id}>
-                            {assignee.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Visiting Charge (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -17,6 +17,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppData, type InstallationData } from "@/context/AppDataContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 const statusConfig: Record<string, { color: string; bgColor: string }> = {
   "Pending Dispatch": { color: "text-muted-foreground", bgColor: "bg-muted" },
@@ -109,6 +111,38 @@ export default function Installations() {
     notes: inst.remarks ?? "",
     acAssetSerial: inst.acAssetSerial ?? "",
     hasEvidence: !!(inst.serialNumberImageUrl || inst.evidenceImagesJson),
+    // Parse remarks: if it looks like JSON materials data, extract it; otherwise treat as plain text
+    materials: (() => {
+      const raw = inst.remarks ?? "";
+      // Try to detect JSON material data patterns
+      const jsonMatch = raw.match(/\{[^{}]*(?:"copper_pipe|"odu_stand|"four_core|"three_core|"drain_pipe|"ladder_rent|"gas_top|"core_cutting|"sedal)[^}]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          const items: { label: string; value: string }[] = [];
+          const labelMap: Record<string, string> = {
+            copper_pipe_meters: "Copper Pipe", odu_stand_qty: "ODU Stand", four_core_wire_meters: "4-Core Wire",
+            three_core_wire_meters: "3-Core Wire", drain_pipe_meters: "Drain Pipe", ladder_rent: "Ladder Rent",
+            gas_top_up: "Gas Top-Up", core_cutting: "Core Cutting", sedal: "Sedal",
+          };
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k === "calculated_costs" || k === "total_calculated_cost") continue;
+            const label = labelMap[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            items.push({ label, value: typeof v === "boolean" ? (v ? "Yes" : "No") : `${v}` });
+          }
+          return items.length > 0 ? items : null;
+        } catch { return null; }
+      }
+      return null;
+    })(),
+    plainNotes: (() => {
+      const raw = inst.remarks ?? "";
+      if (!raw) return "";
+      // If it's purely JSON material data, don't show as notes
+      if (raw.match(/^\s*"?Materials?:?\s*\{/i) || raw.match(/^\s*\{.*copper_pipe/i)) return "";
+      // Remove any inline JSON parts and return the readable text
+      return raw.replace(/\{[^{}]*\}/g, '').replace(/^["\s]+|["\s]+$/g, '').replace(/Materials?:?\s*/i, '').trim();
+    })(),
     _raw: inst,
   }));
 
@@ -127,6 +161,31 @@ export default function Installations() {
   const completed = installations.filter((i) => i.status === "Completed").length;
   const delayed = installations.filter((i) => i.status === "Delayed").length;
 
+  const handleExport = () => {
+    const rows = (appData?.installations || []).map((inst: InstallationData) => ({
+      "Booking/Docket ID": inst.bookingId ?? "",
+      "Site": inst.siteName ?? "",
+      "Site ID": inst.siteId ?? "",
+      "AC Asset Serial": inst.acAssetSerial ?? "",
+      "AC Asset ID": inst.acAssetId ?? "",
+      "Shipment Status": inst.shipmentStatus ?? "",
+      "Status": inst.status ?? "",
+      "ETA": inst.eta ?? "",
+      "Installation Date": inst.installationDate ?? "",
+      "Booking Date": inst.bookingDate ?? "",
+      "Closed Date": inst.closedDate ?? "",
+      "Receiver Name": inst.receiverName ?? "",
+      "Receiver Number": inst.receiverNumber ?? "",
+      "Remarks": inst.remarks ?? "",
+      "Created At": inst.createdAt ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Installations");
+    XLSX.writeFile(wb, `installations_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${rows.length} installations`);
+  };
+
   return (
     <div className="p-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -135,7 +194,7 @@ export default function Installations() {
           <p className="text-sm text-muted-foreground mt-0.5">Track shipments and installation progress</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="default"><Download className="w-4 h-4" />Export</Button>
+          <Button variant="outline" size="default" onClick={handleExport}><Download className="w-4 h-4" />Export</Button>
           <Button variant="outline" size="default" onClick={() => setShowImportDialog(true)}><Upload className="w-4 h-4" />Import</Button>
           <Button size="default" onClick={() => setShowAddDialog(true)}><Plus className="w-4 h-4" />New Installation</Button>
         </div>
@@ -188,9 +247,23 @@ export default function Installations() {
                     <div><p className="text-muted-foreground mb-0.5">Units</p><p className="font-medium">{inst.units} ACS</p></div>
                     <div><p className="text-muted-foreground mb-0.5">Shipped</p><p className="font-medium">{inst.shipmentDate}</p></div>
                     <div><p className="text-muted-foreground mb-0.5">ETA</p><p className={`font-medium ${inst.status === "Delayed" ? "text-[hsl(var(--status-error))]" : ""}`}>{inst.eta}</p></div>
-                    <div><p className="text-muted-foreground mb-0.5">Asset</p><p className="font-medium">{inst.acAssetSerial || "-"}</p></div>
+                    <div><p className="text-muted-foreground mb-0.5">Asset</p><p className="font-medium font-mono text-xs" title={inst.acAssetSerial}>{inst.acAssetSerial ? (inst.acAssetSerial.length > 16 ? `${inst.acAssetSerial.slice(0, 8)}...${inst.acAssetSerial.slice(-5)}` : inst.acAssetSerial) : "-"}</p></div>
                   </div>
-                  {inst.notes && <p className="mt-3 text-sm text-muted-foreground italic">"{inst.notes}"</p>}
+                  {/* Materials breakdown */}
+                  {inst.materials && inst.materials.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Materials Used</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {inst.materials.map((m: { label: string; value: string }, i: number) => (
+                          <Badge key={i} variant="outline" className="text-[10px] font-normal gap-1">
+                            <span className="text-muted-foreground">{m.label}:</span>
+                            <span className="font-medium">{m.value}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {inst.plainNotes && <p className="mt-3 text-sm text-muted-foreground italic">"{inst.plainNotes}"</p>}
                 </div>
                 <div className="flex lg:flex-col gap-2 shrink-0">
                   {inst.hasEvidence && (

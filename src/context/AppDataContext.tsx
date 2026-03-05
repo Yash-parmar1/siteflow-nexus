@@ -133,12 +133,12 @@ export interface FinancialTransaction {
   invoiceRef: string | null;
   siteCode: string | null;
   siteName: string | null;
-  amount: number;
-  cgst: number;
-  sgst: number;
-  totalWithGst: number;
+  amount: number | null;
+  cgst: number | null;
+  sgst: number | null;
+  totalWithGst: number | null;
   paymentStatus: string;
-  daysOverdue: number;
+  daysOverdue: number | null;
   pdfUrl: string | null;
   date: string;
 }

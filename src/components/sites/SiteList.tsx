@@ -11,10 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Filter, Grid3X3, List, FolderKanban, X } from "lucide-react";
+import { Search, Plus, Filter, Grid3X3, List, FolderKanban, X, Download } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import { normalizeStage, computeProgress } from "@/lib/stageUtils";
 
 interface ProjectOption {
   id: string;
@@ -48,24 +51,29 @@ export function SiteList() {
   // Map sites from AppDataContext into shape ProjectBoundSiteCard expects
   const sites = useMemo(() => {
     if (!appData?.sites) return [];
-    return appData.sites.map(s => ({
-      id: String(s.id),
-      name: s.name || "Unnamed Site",
-      location: s.location || s.addressJson || "",
-      stage: (s.currentStage || "WIP") as "Started" | "WTS" | "WIP" | "TIS" | "Installed" | "Live",
-      progress: s.progress ?? 0,
-      acsPlanned: s.acsPlanned ?? s.plannedAcsCount ?? 0,
-      acsInstalled: s.acsInstalled ?? 0,
-      hasDelay: s.hasDelay ?? false,
-      rentStartDate: undefined as string | undefined,
-      projectId: s.projectId ? String(s.projectId) : "",
-      projectName: s.projectName || "",
-      subprojectId: s.subprojectId ? String(s.subprojectId) : "",
-      subprojectName: s.subprojectName || "",
-      configVersion: "1.0",
-      configuredRent: typeof s.configuredRent === 'number' ? s.configuredRent : 0,
-      configuredTenure: typeof s.configuredTenure === 'number' ? s.configuredTenure : 36,
-    }));
+    return appData.sites.map(s => {
+      const stage = normalizeStage(s.currentStage);
+      const planned = s.acsPlanned ?? s.plannedAcsCount ?? 0;
+      const installed = s.acsInstalled ?? 0;
+      return {
+        id: String(s.id),
+        name: s.name || "Unnamed Site",
+        location: s.location || s.addressJson || "",
+        stage,
+        progress: computeProgress(s.progress ?? 0, stage, planned, installed),
+        acsPlanned: planned,
+        acsInstalled: installed,
+        hasDelay: s.hasDelay ?? false,
+        rentStartDate: undefined as string | undefined,
+        projectId: s.projectId ? String(s.projectId) : "",
+        projectName: s.projectName || "",
+        subprojectId: s.subprojectId ? String(s.subprojectId) : "",
+        subprojectName: s.subprojectName || "",
+        configVersion: "1.0",
+        configuredRent: typeof s.configuredRent === 'number' ? s.configuredRent : 0,
+        configuredTenure: typeof s.configuredTenure === 'number' ? s.configuredTenure : 36,
+      };
+    });
   }, [appData?.sites]);
   
   // Read filters from URL
@@ -155,6 +163,43 @@ export function SiteList() {
     );
   }
 
+  const handleExport = () => {
+    const src = filteredSites;
+    if (!src.length) { toast.warning("No sites to export"); return; }
+    const allSites = appData?.sites ?? [];
+    const rows = src.map(s => {
+      const full = allSites.find(x => String(x.id) === s.id);
+      return {
+        "Site Code": full?.siteCode ?? "",
+        "Name": s.name,
+        "Location": s.location,
+        "Project": s.projectName,
+        "Subproject": s.subprojectName,
+        "Client": full?.clientName ?? "",
+        "Site Type": full?.siteType ?? "",
+        "Region Type": full?.regionType ?? "",
+        "Stage": s.stage,
+        "Progress (%)": s.progress,
+        "Status": full?.status ?? "",
+        "Preferred AC Make": full?.preferredAcMake ?? "",
+        "Planned ACs": s.acsPlanned,
+        "ACs Installed": s.acsInstalled,
+        "Has Delay": s.hasDelay ? "Yes" : "No",
+        "Expected Live Date": full?.expectedLiveDate ?? "",
+        "Actual Live Date": full?.actualLiveDate ?? "",
+        "Configured Rent": s.configuredRent,
+        "Configured Tenure": s.configuredTenure,
+        "Notes": full?.notes ?? "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sites");
+    XLSX.writeFile(wb, `Sites_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Exported ${rows.length} sites`);
+  };
+
   return (
     <div className="p-6 animate-fade-in">
       {/* Header */}
@@ -165,10 +210,16 @@ export function SiteList() {
             {filteredSites.length} sites{hasActiveFilters ? " (filtered)" : " across all projects"}
           </p>
         </div>
-        <Button size="default" className="shrink-0" onClick={() => setAddSiteOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Add Site
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="default" onClick={handleExport}>
+            <Download className="w-4 h-4" />
+            Export
+          </Button>
+          <Button size="default" className="shrink-0" onClick={() => setAddSiteOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Site
+          </Button>
+        </div>
       </div>
 
       {/* Active filter banner */}

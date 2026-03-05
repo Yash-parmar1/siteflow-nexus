@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowLeft, MapPin, AlertTriangle, MoreHorizontal, Edit, Download, Trash2, Lock, FolderKanban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { EditSiteDialog } from "@/components/forms/EditSiteDialog";
 
 interface SiteHeaderProps {
   site: {
@@ -31,6 +33,7 @@ interface SiteHeaderProps {
     installationIncluded: boolean;
     maintenanceIncluded: boolean;
   };
+  onRefresh?: () => void;
 }
 
 const stageColors: Record<string, string> = {
@@ -42,8 +45,9 @@ const stageColors: Record<string, string> = {
   Live: "bg-stage-live",
 };
 
-export function SiteHeader({ site }: SiteHeaderProps) {
+export function SiteHeader({ site, onRefresh }: SiteHeaderProps) {
   const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(false);
 
   return (
     <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xl border-b border-border">
@@ -59,7 +63,7 @@ export function SiteHeader({ site }: SiteHeaderProps) {
           </button>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Edit className="w-4 h-4" />
               Edit Site
             </Button>
@@ -221,6 +225,14 @@ export function SiteHeader({ site }: SiteHeaderProps) {
           </div>
         </div>
       </div>
+
+      <EditSiteDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        siteId={site.id}
+        siteName={site.name}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }
