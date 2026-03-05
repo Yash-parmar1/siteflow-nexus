@@ -1,9 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { ConfigurationBadge } from "@/components/sites/ConfigurationBadge";
+import { AssetLifecycleTimeline } from "@/components/assets/AssetLifecycleTimeline";
+import { InstallationMaterialsForm } from "@/components/assets/InstallationMaterialsForm";
+import { DynamicMetadataForm } from "@/components/assets/DynamicMetadataForm";
 import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
 import {
   ArrowLeft,
@@ -24,6 +29,7 @@ import {
   Printer,
   MoreHorizontal,
   Building,
+  Folder,
   Lock,
   TrendingUp,
   History,
@@ -36,141 +42,196 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { useAppData } from "@/context/AppDataContext";
-import api from "@/lib/api";
+import type { ACSAsset, LifecycleEvent, InstallationMaterial, MetadataField, MediaEvidence, DocumentEvidence, MaintenanceRecord } from "@/types/asset";
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  "ACTIVE": { label: "Operational", color: "status-success" },
-  "operational": { label: "Operational", color: "status-success" },
-  "INACTIVE": { label: "Inactive", color: "status-neutral" },
+// Mock data for a comprehensive asset
+const mockAsset: ACSAsset = {
+  id: "ACS-001",
+  serialNumber: "SN-2024-0001",
+  model: "ProCool 5000X",
+  manufacturer: "CoolTech Industries",
+  status: "operational",
+  currentSiteId: "site-001",
+  currentSiteName: "Metro Tower - Block A",
+  locationWithinSite: "Floor 12, Zone A",
+  
+  // Contract/tenure
+  tenureMonths: 36,
+  rentStartDate: "2024-01-15",
+  rentEndDate: "2027-01-14",
+  contractStatus: "active",
+  daysRemaining: 730,
+  monthlyRent: 15000,
+  
+  // Configuration
+  configurationId: "config-001",
+  configurationVersion: "1.0",
+  projectId: "proj-001",
+  projectName: "Dava India",
+  subprojectId: "subproj-002",
+  subprojectName: "Mumbai Region",
+  
+  // Installation details
+  installationDetails: {
+    id: "inst-001",
+    acsUnitId: "ACS-001",
+    installationDate: "2024-01-15",
+    completedBy: "Rajesh Kumar",
+    teamId: "team-alpha",
+    teamName: "Team Alpha",
+    startTime: "09:00",
+    endTime: "14:30",
+    durationMinutes: 330,
+    materials: [
+      { id: "m1", name: "Power Cable 2.5mm", category: "cables", quantity: 15, unit: "meters", brand: "Havells", cost: 45 },
+      { id: "m2", name: "Wall Mount Bracket", category: "brackets", quantity: 2, unit: "pcs", brand: "Unistrut", model: "P1001", cost: 850 },
+      { id: "m3", name: "Temperature Sensor", category: "sensors", quantity: 1, unit: "pcs", brand: "Honeywell", serialNumber: "TS-2024-001", cost: 2500 },
+      { id: "m4", name: "Cable Ties 300mm", category: "consumables", quantity: 50, unit: "pcs", brand: "3M", cost: 5 },
+      { id: "m5", name: "Stabilizer 5KVA", category: "stabilizers", quantity: 1, unit: "pcs", brand: "V-Guard", model: "VGMEW 500", serialNumber: "VG-2024-0123", cost: 8500 },
+    ],
+    metadata: [
+      { key: "power_supply_phase", label: "Power Supply Phase", value: "3-Phase", type: "select", category: "Electrical" },
+      { key: "voltage_reading", label: "Voltage Reading", value: 415, type: "number", unit: "V", category: "Electrical" },
+      { key: "earthing_checked", label: "Earthing Verified", value: true, type: "boolean", category: "Safety" },
+      { key: "ambient_temp", label: "Ambient Temperature", value: 28, type: "number", unit: "°C", category: "Environment" },
+      { key: "humidity", label: "Humidity Level", value: 65, type: "number", unit: "%", category: "Environment" },
+    ],
+    photos: [
+      { id: "p1", url: "", thumbnailUrl: "", fileName: "installation_front.jpg", fileSize: 2400000, mimeType: "image/jpeg", uploadedAt: "2024-01-15T14:00:00Z", uploadedBy: "Rajesh Kumar", caption: "Front view after installation", tags: ["installation", "completed"] },
+      { id: "p2", url: "", thumbnailUrl: "", fileName: "wiring_complete.jpg", fileSize: 1800000, mimeType: "image/jpeg", uploadedAt: "2024-01-15T13:30:00Z", uploadedBy: "Rajesh Kumar", caption: "Wiring connections", tags: ["wiring"] },
+      { id: "p3", url: "", thumbnailUrl: "", fileName: "stabilizer_setup.jpg", fileSize: 2100000, mimeType: "image/jpeg", uploadedAt: "2024-01-15T12:00:00Z", uploadedBy: "Rajesh Kumar", caption: "Stabilizer installation", tags: ["stabilizer"] },
+    ],
+    videos: [
+      { id: "v1", url: "", thumbnailUrl: "", fileName: "installation_walkthrough.mp4", fileSize: 45000000, mimeType: "video/mp4", uploadedAt: "2024-01-15T14:30:00Z", uploadedBy: "Rajesh Kumar", caption: "Complete installation walkthrough" },
+    ],
+    documents: [
+      { id: "d1", fileUrl: "", fileName: "installation_checklist.pdf", fileSize: 150000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:35:00Z", uploadedBy: "Rajesh Kumar", documentType: "checklist", description: "Signed installation checklist" },
+      { id: "d2", fileUrl: "", fileName: "warranty_card.pdf", fileSize: 80000, mimeType: "application/pdf", uploadedAt: "2024-01-15T14:40:00Z", uploadedBy: "Rajesh Kumar", documentType: "warranty", description: "Manufacturer warranty card" },
+    ],
+    qualityCheckPassed: true,
+    qualityCheckedBy: "Amit Verma",
+    qualityCheckDate: "2024-01-16",
+    generalNotes: "Installation completed smoothly. Client requested additional cable management.",
+    siteId: "site-001",
+    siteName: "Metro Tower - Block A",
+    projectId: "proj-001",
+    projectName: "Dava India",
+    subprojectId: "subproj-002",
+    subprojectName: "Mumbai Region",
+    configurationId: "config-001",
+    configurationVersion: "1.0",
+  },
+  
+  // Maintenance history
+  maintenanceHistory: [
+    {
+      id: "maint-001",
+      acsUnitId: "ACS-001",
+      type: "scheduled",
+      status: "completed",
+      scheduledDate: "2024-04-15",
+      startedAt: "2024-04-15T10:00:00Z",
+      completedAt: "2024-04-15T12:30:00Z",
+      performedBy: "Suresh Patel",
+      description: "Quarterly preventive maintenance",
+      partsReplaced: [],
+      metadata: [
+        { key: "filter_cleaned", label: "Filter Cleaned", value: true, type: "boolean", category: "Maintenance" },
+        { key: "coolant_level", label: "Coolant Level", value: "OK", type: "text", category: "Maintenance" },
+      ],
+      laborCost: 1500,
+      partsCost: 0,
+      totalCost: 1500,
+      photos: [],
+      documents: [],
+      siteId: "site-001",
+      siteName: "Metro Tower - Block A",
+    },
+    {
+      id: "maint-002",
+      acsUnitId: "ACS-001",
+      type: "unscheduled",
+      status: "completed",
+      startedAt: "2024-06-20T14:00:00Z",
+      completedAt: "2024-06-20T17:00:00Z",
+      performedBy: "Amit Verma",
+      description: "Compressor noise issue - bearing replacement",
+      partsReplaced: [
+        { id: "part-001", partName: "Compressor Bearing", partNumber: "CB-5000-01", oldSerialNumber: "OLD-123", newSerialNumber: "NEW-456", quantity: 1, cost: 3500, reason: "Worn out bearing causing noise" },
+      ],
+      metadata: [],
+      laborCost: 2000,
+      partsCost: 3500,
+      totalCost: 5500,
+      photos: [],
+      documents: [],
+      ticketId: "TKT-2024-089",
+      siteId: "site-001",
+      siteName: "Metro Tower - Block A",
+    },
+  ],
+  
+  // Lifecycle events
+  lifecycleEvents: [
+    { id: "e1", acsUnitId: "ACS-001", eventType: "created", timestamp: "2023-12-01T10:00:00Z", performedBy: "System", title: "Asset Created", description: "Asset registered in inventory" },
+    { id: "e2", acsUnitId: "ACS-001", eventType: "assigned-to-site", timestamp: "2024-01-10T09:00:00Z", performedBy: "Operations Team", title: "Assigned to Site", description: "Assigned to Metro Tower - Block A", siteName: "Metro Tower - Block A" },
+    { id: "e3", acsUnitId: "ACS-001", eventType: "shipped", timestamp: "2024-01-12T08:00:00Z", performedBy: "Logistics", title: "Shipped to Site", referenceType: "shipment", referenceId: "SHIP-2024-001" },
+    { id: "e4", acsUnitId: "ACS-001", eventType: "delivered", timestamp: "2024-01-14T15:00:00Z", performedBy: "Logistics", title: "Delivered", description: "Received at site warehouse" },
+    { id: "e5", acsUnitId: "ACS-001", eventType: "installation-started", timestamp: "2024-01-15T09:00:00Z", performedBy: "Rajesh Kumar", title: "Installation Started", siteName: "Metro Tower - Block A" },
+    { id: "e6", acsUnitId: "ACS-001", eventType: "installation-completed", timestamp: "2024-01-15T14:30:00Z", performedBy: "Rajesh Kumar", title: "Installation Completed", description: "All checks passed", referenceType: "installation", referenceId: "inst-001", photos: [{ id: "p1", url: "", thumbnailUrl: "", fileName: "complete.jpg", fileSize: 1000000, mimeType: "image/jpeg", uploadedAt: "2024-01-15T14:30:00Z", uploadedBy: "Rajesh Kumar" }] },
+    { id: "e7", acsUnitId: "ACS-001", eventType: "activated", timestamp: "2024-01-15T15:00:00Z", performedBy: "Amit Verma", title: "Asset Activated", description: "Quality check passed, unit activated", configurationVersion: "1.0" },
+    { id: "e8", acsUnitId: "ACS-001", eventType: "rent-started", timestamp: "2024-01-15T15:00:00Z", performedBy: "System", title: "Rent Started", description: "36-month tenure begins" },
+    { id: "e9", acsUnitId: "ACS-001", eventType: "maintenance-completed", timestamp: "2024-04-15T12:30:00Z", performedBy: "Suresh Patel", title: "Quarterly Maintenance", description: "Preventive maintenance completed", referenceType: "maintenance", referenceId: "maint-001" },
+    { id: "e10", acsUnitId: "ACS-001", eventType: "issue-reported", timestamp: "2024-06-20T10:00:00Z", performedBy: "Client", title: "Issue Reported", description: "Compressor noise reported", referenceType: "ticket", referenceId: "TKT-2024-089" },
+    { id: "e11", acsUnitId: "ACS-001", eventType: "part-replaced", timestamp: "2024-06-20T17:00:00Z", performedBy: "Amit Verma", title: "Part Replaced", description: "Compressor bearing replaced", referenceType: "maintenance", referenceId: "maint-002" },
+    { id: "e12", acsUnitId: "ACS-001", eventType: "issue-resolved", timestamp: "2024-06-20T17:30:00Z", performedBy: "Amit Verma", title: "Issue Resolved", description: "Ticket closed, unit operational" },
+  ],
+  
+  // All evidence
+  allPhotos: [],
+  allVideos: [],
+  allDocuments: [],
+  
+  // Financial
+  totalRevenueEarned: 180000,
+  totalMaintenanceCost: 7000,
+  netContribution: 173000,
+  
+  // Warranty
+  warrantyStartDate: "2024-01-15",
+  warrantyEndDate: "2027-01-14",
+  warrantyStatus: "active",
+  
+  // Audit
+  createdAt: "2023-12-01T10:00:00Z",
+  createdBy: "System",
+  lastModifiedAt: "2024-06-20T17:30:00Z",
+  lastModifiedBy: "Amit Verma",
+};
+
+const statusConfig = {
   "in-stock": { label: "In Stock", color: "status-neutral" },
   "in-transit": { label: "In Transit", color: "status-info" },
   "pending-install": { label: "Pending Install", color: "status-info" },
-  "MAINTENANCE": { label: "Under Maintenance", color: "status-warning" },
+  "operational": { label: "Operational", color: "status-success" },
   "maintenance": { label: "Under Maintenance", color: "status-warning" },
-  "DECOMMISSIONED": { label: "Decommissioned", color: "status-neutral" },
-  "REPLACED": { label: "Replaced", color: "status-neutral" },
   "faulty": { label: "Faulty", color: "status-error" },
   "offline": { label: "Offline", color: "status-error" },
+  "decommissioned": { label: "Decommissioned", color: "status-neutral" },
 };
-
-interface MaintenanceRecord {
-  id: number;
-  ticketId?: number;
-  description: string;
-  actionTaken?: string;
-  performedBy?: string;
-  performedAt?: string;
-  costIncurred?: number;
-  partsReplaced?: string;
-  nextScheduledDate?: string;
-}
-
-interface AuditLogEntry {
-  id: number;
-  action: string;
-  entityTable: string;
-  entityId: number;
-  description: string;
-  performedBy: any;
-  timestamp: string;
-  oldValue?: string;
-  newValue?: string;
-}
 
 export default function AssetDetail() {
   const { assetId } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const { data: appData, loading } = useAppData();
-  const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [evidencePhotos, setEvidencePhotos] = useState<any[]>([]);
-  const [evidenceDocuments, setEvidenceDocuments] = useState<any[]>([]);
 
-  // Find asset from context
-  const assetData = appData?.assets?.find(a => String(a.id) === assetId);
-  
-  // Find installation for this asset
-  const installation = appData?.installations?.find(i => String(i.acAssetId) === assetId);
-  
-  // Find maintenance tickets for this asset
-  const tickets = appData?.maintenanceTickets?.filter(t => String(t.acAssetId) === assetId) || [];
+  const asset = mockAsset; // In real app, fetch by assetId
+  const status = statusConfig[asset.status];
 
-  // Fetch maintenance history & audit logs
-  useEffect(() => {
-    if (!assetId) return;
-    
-    api.get(`/maintenance-history/asset/${assetId}`)
-      .then(res => setMaintenanceHistory(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {});
-
-    api.get(`/audit/logs?entityTable=ac_assets&entityId=${assetId}&page=0&size=50`)
-      .then(res => {
-        const logs = res.data?.content || res.data || [];
-        setAuditLogs(Array.isArray(logs) ? logs : []);
-      })
-      .catch(() => {});
-  }, [assetId]);
-
-  // Parse evidence images from installation
-  useEffect(() => {
-    if (installation?.evidenceImagesJson) {
-      try {
-        const urls = JSON.parse(installation.evidenceImagesJson as string);
-        if (Array.isArray(urls)) {
-          setEvidencePhotos(urls.map((url: string, i: number) => ({
-            id: `photo-${i}`,
-            url,
-            thumbnailUrl: url,
-            fileName: url.split('/').pop() || `photo-${i}.jpg`,
-            fileSize: 0,
-            mimeType: "image/jpeg",
-            uploadedAt: installation.createdAt || new Date().toISOString(),
-            uploadedBy: "System",
-          })));
-        }
-      } catch {}
-    }
-    if (installation?.serialNumberImageUrl) {
-      setEvidenceDocuments([{
-        id: "serial-img",
-        fileUrl: installation.serialNumberImageUrl,
-        fileName: "serial-number.jpg",
-        fileSize: 0,
-        mimeType: "image/jpeg",
-        uploadedAt: installation.createdAt || new Date().toISOString(),
-        uploadedBy: "System",
-        documentType: "serial",
-        description: "Serial number image",
-      }]);
-    }
-  }, [installation]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading asset details...</p>
-      </div>
-    );
-  }
-
-  if (!assetData) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <Box className="w-16 h-16 text-muted-foreground/30" />
-        <h2 className="text-xl font-semibold">Asset Not Found</h2>
-        <p className="text-muted-foreground">Asset #{assetId} could not be found.</p>
-        <Button variant="outline" onClick={() => navigate("/assets")}>Back to Assets</Button>
-      </div>
-    );
-  }
-
-  // Map to display values
-  const status = statusConfig[assetData.status] || { label: assetData.status, color: "status-neutral" };
-  const monthlyRent = assetData.monthlyRent ?? 0;
-  const warrantyActive = assetData.warrantyExpiryDate ? new Date(assetData.warrantyExpiryDate) > new Date() : false;
-  const totalMaintenanceCost = maintenanceHistory.reduce((s, m) => s + (m.costIncurred || 0), 0);
+  // Calculate tenure progress
+  const tenureProgress = asset.tenureMonths && asset.daysRemaining
+    ? ((asset.tenureMonths * 30 - asset.daysRemaining) / (asset.tenureMonths * 30)) * 100
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -193,7 +254,7 @@ export default function AssetDetail() {
                   Assets
                 </Link>
                 <span className="mx-2 text-muted-foreground/50">/</span>
-                <span className="text-foreground font-medium">{assetData.serialNumber}</span>
+                <span className="text-foreground font-medium">{asset.serialNumber}</span>
               </nav>
             </div>
             
@@ -247,7 +308,7 @@ export default function AssetDetail() {
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-3xl font-semibold text-foreground tracking-tight">
-                    {assetData.serialNumber}
+                    {asset.serialNumber}
                   </h1>
                   <span
                     className="status-badge px-3 py-1.5 text-sm font-medium"
@@ -264,13 +325,8 @@ export default function AssetDetail() {
                   </span>
                 </div>
                 <p className="text-base text-muted-foreground">
-                  {assetData.model || "Unknown Model"} · {assetData.manufacturer || "Unknown Manufacturer"} {assetData.sizeInTon ? `· ${assetData.sizeInTon}T` : ''}
+                  {asset.model} · {asset.manufacturer}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${assetData.indoorAc ? 'bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))]' : 'bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]'}`}>
-                    {assetData.indoorAc ? 'Indoor Unit' : 'Outdoor Unit'}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -279,18 +335,16 @@ export default function AssetDetail() {
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border/50">
                 <MapPin className="w-4 h-4 text-primary" />
                 <Link 
-                  to={`/site/${assetData.siteId}`} 
+                  to={`/site/${asset.currentSiteId}`} 
                   className="text-sm font-medium hover:text-primary transition-colors"
                 >
-                  {assetData.siteName || "Unassigned"}
+                  {asset.currentSiteName}
                 </Link>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border/50">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">
-                  {installation?.installationDate 
-                    ? `Installed ${new Date(installation.installationDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}` 
-                    : `Size: ${assetData.sizeInTon ?? 'N/A'} Ton`}
+                  Installed {new Date(asset.installationDetails?.installationDate || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               </div>
             </div>
@@ -305,16 +359,16 @@ export default function AssetDetail() {
               </div>
               <div className="flex items-center gap-2">
                 <Building className="w-4 h-4 text-foreground" />
-                <span className="text-sm font-semibold text-foreground">{assetData.projectName || "N/A"}</span>
+                <span className="text-sm font-semibold text-foreground">{asset.projectName}</span>
               </div>
-              {assetData.subprojectName && (
+              {asset.subprojectName && (
                 <>
                   <span className="text-muted-foreground/50">·</span>
-                  <span className="text-sm font-medium text-foreground">{assetData.subprojectName}</span>
+                  <span className="text-sm font-medium text-foreground">{asset.subprojectName}</span>
                 </>
               )}
               <span className="ml-auto px-3 py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold">
-                {assetData.status}
+                Version {asset.configurationVersion || "1.0"}
               </span>
             </div>
           </div>
@@ -362,43 +416,42 @@ export default function AssetDetail() {
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-primary" />
-                    Asset Details
+                    Contract & Tenure
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Monthly Rent</p>
-                      <p className="text-2xl font-bold text-foreground">₹{monthlyRent.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Size</p>
-                      <p className="text-2xl font-bold text-foreground">{assetData.sizeInTon ?? "N/A"} <span className="text-base font-normal text-muted-foreground">Ton</span></p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tenure</p>
+                      <p className="text-2xl font-bold text-foreground">{asset.tenureMonths} <span className="text-base font-normal text-muted-foreground">months</span></p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Purchase Cost</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Start Date</p>
                       <p className="text-lg font-semibold text-foreground">
-                        {assetData.purchaseCost ? `₹${assetData.purchaseCost.toLocaleString()}` : "N/A"}
+                        {new Date(asset.rentStartDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Model No.</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">End Date</p>
                       <p className="text-lg font-semibold text-foreground">
-                        {assetData.modelNumber || assetData.model || "N/A"}
+                        {new Date(asset.rentEndDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                   </div>
 
-                  {assetData.nextMaintenanceDate && (
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-muted-foreground">Next Maintenance</span>
-                        <span className="font-semibold text-foreground">
-                          {new Date(assetData.nextMaintenanceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                        </span>
-                      </div>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-muted-foreground">Contract Progress</span>
+                      <span className="font-semibold text-foreground">
+                        {asset.daysRemaining} days remaining
+                      </span>
                     </div>
-                  )}
+                    <Progress value={tenureProgress} className="h-2.5" />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -415,16 +468,16 @@ export default function AssetDetail() {
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Site</p>
                       <Link 
-                        to={`/site/${assetData.siteId}`} 
+                        to={`/site/${asset.currentSiteId}`} 
                         className="text-base font-semibold text-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
                       >
-                        {assetData.siteName || "Unassigned"}
+                        {asset.currentSiteName}
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Link>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Specific Location</p>
-                      <p className="text-base font-semibold text-foreground">{assetData.locationInSite || "N/A"}</p>
+                      <p className="text-base font-semibold text-foreground">{asset.locationWithinSite}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -440,18 +493,16 @@ export default function AssetDetail() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-muted-foreground">Status</span>
                       <Badge 
-                        variant={warrantyActive ? "default" : "secondary"}
+                        variant={asset.warrantyStatus === "active" ? "default" : "secondary"}
                         className="font-semibold"
                       >
-                        {warrantyActive ? "Active" : "Expired"}
+                        {asset.warrantyStatus === "active" ? "Active" : "Expired"}
                       </Badge>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Valid Until</p>
                       <p className="text-base font-semibold text-foreground">
-                        {assetData.warrantyExpiryDate 
-                          ? new Date(assetData.warrantyExpiryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                          : "N/A"}
+                        {new Date(asset.warrantyEndDate || "").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                   </CardContent>
@@ -478,22 +529,8 @@ export default function AssetDetail() {
                   </div>
                 </CardHeader>
                 <CardContent className="px-6 pb-6">
-                  <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3">
-                    {auditLogs.length > 0 ? auditLogs.slice(0, 8).map((log) => (
-                      <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <div className="w-2 h-2 mt-2 rounded-full bg-primary shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">{log.description || log.action}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {typeof log.performedBy === 'string' ? log.performedBy : (log.performedBy?.firstName ? `${log.performedBy.firstName} ${log.performedBy.lastName || ''}`.trim() : 'System')}
-                            {' · '}
-                            {new Date(log.timestamp).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
-                        </div>
-                      </div>
-                    )) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No activity recorded yet</p>
-                    )}
+                  <div className="max-h-[400px] overflow-y-auto pr-2">
+                    <AssetLifecycleTimeline events={asset.lifecycleEvents.slice(-8).reverse()} compact />
                   </div>
                 </CardContent>
               </Card>
@@ -514,17 +551,17 @@ export default function AssetDetail() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Monthly Rent</span>
-                    <span className="text-lg font-semibold text-foreground">₹{monthlyRent.toLocaleString()}</span>
+                    <span className="text-sm text-muted-foreground">Revenue Earned</span>
+                    <span className="text-lg font-semibold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Maintenance Cost</span>
-                    <span className="text-lg font-semibold text-status-error">₹{totalMaintenanceCost.toLocaleString()}</span>
+                    <span className="text-lg font-semibold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</span>
                   </div>
                   <div className="h-px bg-border" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Purchase Cost</span>
-                    <span className="text-xl font-bold text-foreground">{assetData.purchaseCost ? `₹${assetData.purchaseCost.toLocaleString()}` : 'N/A'}</span>
+                    <span className="text-sm font-medium">Net Contribution</span>
+                    <span className="text-xl font-bold text-foreground">₹{asset.netContribution?.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -540,19 +577,19 @@ export default function AssetDetail() {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm font-medium text-muted-foreground">Total Services</span>
-                    <span className="text-lg font-bold text-foreground">{maintenanceHistory.length}</span>
+                    <span className="text-lg font-bold text-foreground">{asset.maintenanceHistory.length}</span>
                   </div>
                   <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-muted-foreground">Open Tickets</span>
+                    <span className="text-sm font-medium text-muted-foreground">Parts Replaced</span>
                     <span className="text-lg font-bold text-foreground">
-                      {tickets.filter(t => t.status !== 'CLOSED' && t.status !== 'RESOLVED').length}
+                      {asset.maintenanceHistory.reduce((sum, m) => sum + m.partsReplaced.length, 0)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm font-medium text-muted-foreground">Last Service</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {assetData.lastMaintenanceDate
-                        ? new Date(assetData.lastMaintenanceDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+                      {asset.maintenanceHistory.length > 0
+                        ? new Date(asset.maintenanceHistory[asset.maintenanceHistory.length - 1].completedAt || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
                         : "N/A"}
                     </span>
                   </div>
@@ -589,15 +626,15 @@ export default function AssetDetail() {
                 <CardContent>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
-                      <p className="text-2xl font-bold text-foreground">{evidencePhotos.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.photos.length || 0}</p>
                       <p className="text-xs font-medium text-muted-foreground mt-1">Photos</p>
                     </div>
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
-                      <p className="text-2xl font-bold text-foreground">0</p>
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.videos.length || 0}</p>
                       <p className="text-xs font-medium text-muted-foreground mt-1">Videos</p>
                     </div>
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
-                      <p className="text-2xl font-bold text-foreground">{evidenceDocuments.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{asset.installationDetails?.documents.length || 0}</p>
                       <p className="text-xs font-medium text-muted-foreground mt-1">Documents</p>
                     </div>
                   </div>
@@ -623,19 +660,25 @@ export default function AssetDetail() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {maintenanceHistory.slice(-3).reverse().map((record) => (
+                  {asset.maintenanceHistory.slice(-3).reverse().map((record) => (
                     <div key={record.id} className="p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <p className="font-medium text-sm text-foreground line-clamp-2">{record.description}</p>
+                        <Badge 
+                          variant={record.type === "scheduled" ? "secondary" : "outline"}
+                          className="shrink-0 text-xs"
+                        >
+                          {record.type}
+                        </Badge>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{record.performedBy || "—"}</span>
-                        <span>{record.performedAt ? new Date(record.performedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : "—"}</span>
+                        <span>{record.performedBy}</span>
+                        <span>{new Date(record.completedAt || record.startedAt || "").toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
                       </div>
                     </div>
                   ))}
 
-                  {maintenanceHistory.length === 0 && (
+                  {asset.maintenanceHistory.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">No maintenance records yet</p>
                   )}
                 </CardContent>
@@ -645,101 +688,89 @@ export default function AssetDetail() {
         )}
 
         {/* Installation Tab */}
-        {activeTab === "installation" && (
+        {activeTab === "installation" && asset.installationDetails && (
           <div className="max-w-5xl space-y-8">
-            {installation ? (
-              <>
-                {/* Installation Summary */}
-                <Card className="data-card border-border/50 shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <CheckCircle2 className="w-6 h-6 text-status-success" />
-                      Installation {installation.status === 'COMPLETED' ? 'Complete' : installation.status || 'Details'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</p>
-                        <p className="text-base font-semibold text-foreground">
-                          {installation.installationDate 
-                            ? new Date(installation.installationDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                            : "Pending"}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Site</p>
-                        <p className="text-base font-semibold text-foreground">{installation.siteName}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Receiver</p>
-                        <p className="text-base font-semibold text-foreground">{installation.receiverName || "N/A"}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shipment Status</p>
-                        <Badge variant="secondary" className="font-semibold">
-                          {installation.shipmentStatus}
-                        </Badge>
-                      </div>
+            {/* Installation Summary */}
+            <Card className="data-card border-border/50 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-6 h-6 text-status-success" />
+                  Installation Complete
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.installationDate}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Team</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.teamName}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed By</p>
+                    <p className="text-base font-semibold text-foreground">{asset.installationDetails.completedBy}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duration</p>
+                    <p className="text-base font-semibold text-foreground">
+                      {Math.floor((asset.installationDetails.durationMinutes || 0) / 60)}h {(asset.installationDetails.durationMinutes || 0) % 60}m
+                    </p>
+                  </div>
+                </div>
+
+                {asset.installationDetails.qualityCheckPassed && (
+                  <div className="p-4 rounded-xl bg-status-success/10 border border-status-success/20 flex items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-status-success shrink-0" />
+                    <div>
+                      <p className="font-semibold text-foreground">Quality Check Passed</p>
+                      <p className="text-sm text-muted-foreground">
+                        Verified by {asset.installationDetails.qualityCheckedBy} on {asset.installationDetails.qualityCheckDate}
+                      </p>
                     </div>
-
-                    {installation.remarks && (
-                      <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Remarks</p>
-                        <p className="text-foreground">{installation.remarks}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Evidence from installation */}
-                {(evidencePhotos.length > 0 || evidenceDocuments.length > 0) && (
-                  <Card className="data-card border-border/50 shadow-sm">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Installation Evidence</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <EvidenceGallery
-                        photos={evidencePhotos}
-                        videos={[]}
-                        documents={evidenceDocuments}
-                        readOnly
-                      />
-                    </CardContent>
-                  </Card>
+                  </div>
                 )}
+              </CardContent>
+            </Card>
 
-                {/* Installation Timeline */}
-                <Card className="data-card border-border/50 shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Installation Timeline</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {[
-                        { label: "Booking Created", date: installation.bookingDate, status: installation.bookingDate ? "done" : "pending" },
-                        { label: "ETA", date: installation.eta, status: installation.eta ? "done" : "pending" },
-                        { label: "Installation Date", date: installation.installationDate, status: installation.installationDate ? "done" : "pending" },
-                        { label: "Closed", date: installation.closedDate, status: installation.closedDate ? "done" : "pending" },
-                      ].map((step, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full shrink-0 ${step.status === 'done' ? 'bg-status-success' : 'bg-muted-foreground/30'}`} />
-                          <span className="text-sm font-medium text-foreground w-40">{step.label}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {step.date ? new Date(step.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : "—"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <Card className="data-card border-border/50">
-                <CardContent className="flex flex-col items-center justify-center py-16">
-                  <Wrench className="w-16 h-16 text-muted-foreground/30 mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No Installation Record</h3>
-                  <p className="text-sm text-muted-foreground">No installation has been recorded for this asset yet</p>
+            {/* Materials Used */}
+            <Card className="data-card border-border/50 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Materials Used</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <InstallationMaterialsForm
+                  materials={asset.installationDetails.materials}
+                  onChange={() => {}}
+                  readOnly
+                />
+              </CardContent>
+            </Card>
+
+            {/* Installation Metadata */}
+            <Card className="data-card border-border/50 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Installation Parameters</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DynamicMetadataForm
+                  fields={asset.installationDetails.metadata}
+                  onChange={() => {}}
+                  readOnly
+                  showAddCustom={false}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Installation Notes */}
+            {asset.installationDetails.generalNotes && (
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg">Installation Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground leading-relaxed">{asset.installationDetails.generalNotes}</p>
                 </CardContent>
               </Card>
             )}
@@ -760,44 +791,58 @@ export default function AssetDetail() {
               </Button>
             </div>
 
-            {maintenanceHistory.map((record) => (
+            {asset.maintenanceHistory.map((record) => (
               <Card key={record.id} className="data-card border-border/50 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <CardTitle className="text-lg">{record.description}</CardTitle>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span className="font-medium">{record.performedBy || "—"}</span>
+                        <span className="font-medium">{record.performedBy}</span>
                         <span className="text-muted-foreground/50">·</span>
-                        <span>{record.performedAt ? new Date(record.performedAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' }) : "—"}</span>
+                        <span>{new Date(record.completedAt || record.startedAt || "").toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                       </p>
                     </div>
+                    <Badge 
+                      variant={record.type === "scheduled" ? "secondary" : "outline"}
+                      className="shrink-0"
+                    >
+                      {record.type === "scheduled" ? "Scheduled" : "Unscheduled"}
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {record.actionTaken && (
+                  {record.partsReplaced.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-2 text-foreground">Action Taken</h4>
-                      <p className="text-sm text-muted-foreground">{record.actionTaken}</p>
-                    </div>
-                  )}
-
-                  {record.partsReplaced && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2 text-foreground">Parts Replaced</h4>
-                      <p className="text-sm text-muted-foreground">{record.partsReplaced}</p>
+                      <h4 className="text-sm font-semibold mb-3 text-foreground">Parts Replaced</h4>
+                      <div className="space-y-3">
+                        {record.partsReplaced.map((part) => (
+                          <div 
+                            key={part.id} 
+                            className="flex items-start justify-between p-4 rounded-lg bg-muted/30 border border-border/50"
+                          >
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">{part.partName}</p>
+                              <p className="text-sm text-muted-foreground">{part.reason}</p>
+                            </div>
+                            <span className="font-semibold text-foreground shrink-0 ml-4">
+                              ₹{part.cost?.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between pt-4 border-t border-border">
-                    <span className="text-sm font-medium text-muted-foreground">Cost Incurred</span>
-                    <span className="text-xl font-bold text-foreground">₹{(record.costIncurred || 0).toLocaleString()}</span>
+                    <span className="text-sm font-medium text-muted-foreground">Total Cost</span>
+                    <span className="text-xl font-bold text-foreground">₹{record.totalCost?.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
             ))}
 
-            {maintenanceHistory.length === 0 && (
+            {asset.maintenanceHistory.length === 0 && (
               <Card className="data-card border-border/50">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Wrench className="w-16 h-16 text-muted-foreground/30 mb-4" />
@@ -814,29 +859,19 @@ export default function AssetDetail() {
         )}
 
         {/* Evidence Tab */}
-        {activeTab === "evidence" && (
+        {activeTab === "evidence" && asset.installationDetails && (
           <div className="max-w-6xl">
             <div className="mb-6">
               <h2 className="text-2xl font-semibold text-foreground">Evidence & Documentation</h2>
               <p className="text-muted-foreground mt-1">Photos, videos, and documents related to this asset</p>
             </div>
-            {(evidencePhotos.length > 0 || evidenceDocuments.length > 0) ? (
-              <EvidenceGallery
-                photos={evidencePhotos}
-                videos={[]}
-                documents={evidenceDocuments}
-                readOnly={false}
-                onUpload={(type) => console.log("Upload:", type)}
-              />
-            ) : (
-              <Card className="data-card border-border/50">
-                <CardContent className="flex flex-col items-center justify-center py-16">
-                  <Camera className="w-16 h-16 text-muted-foreground/30 mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No Evidence Available</h3>
-                  <p className="text-sm text-muted-foreground">No photos or documents have been uploaded for this asset yet</p>
-                </CardContent>
-              </Card>
-            )}
+            <EvidenceGallery
+              photos={asset.installationDetails.photos}
+              videos={asset.installationDetails.videos}
+              documents={asset.installationDetails.documents}
+              readOnly={false}
+              onUpload={(type) => console.log("Upload:", type)}
+            />
           </div>
         )}
 
@@ -852,29 +887,29 @@ export default function AssetDetail() {
               <Card className="data-card border-border/50 shadow-sm">
                 <CardContent className="p-6 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Monthly Rent</p>
-                  <p className="text-3xl font-bold text-foreground">₹{monthlyRent.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground">per month</p>
                 </CardContent>
               </Card>
-              <Card className="data-card border-border/50 shadow-sm">
+              <Card className="data-card border-status-success/20 shadow-sm bg-status-success/5">
                 <CardContent className="p-6 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Purchase Cost</p>
-                  <p className="text-3xl font-bold text-foreground">{assetData.purchaseCost ? `₹${assetData.purchaseCost.toLocaleString()}` : 'N/A'}</p>
-                  <p className="text-xs text-muted-foreground">one-time</p>
+                  <p className="text-xs font-medium text-status-success uppercase tracking-wide">Total Revenue</p>
+                  <p className="text-3xl font-bold text-status-success">₹{asset.totalRevenueEarned?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">since activation</p>
                 </CardContent>
               </Card>
               <Card className="data-card border-status-error/20 shadow-sm bg-status-error/5">
                 <CardContent className="p-6 space-y-2">
                   <p className="text-xs font-medium text-status-error uppercase tracking-wide">Maintenance Cost</p>
-                  <p className="text-3xl font-bold text-status-error">₹{totalMaintenanceCost.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-status-error">₹{asset.totalMaintenanceCost?.toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground">total spent</p>
                 </CardContent>
               </Card>
               <Card className="data-card border-primary/20 shadow-sm bg-primary/5">
                 <CardContent className="p-6 space-y-2">
-                  <p className="text-xs font-medium text-primary uppercase tracking-wide">First Month Rent</p>
-                  <p className="text-3xl font-bold text-foreground">{assetData.firstMonthRent ? `₹${assetData.firstMonthRent.toLocaleString()}` : 'N/A'}</p>
-                  <p className="text-xs text-muted-foreground">initial charge</p>
+                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Net Contribution</p>
+                  <p className="text-3xl font-bold text-foreground">₹{asset.netContribution?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">revenue - costs</p>
                 </CardContent>
               </Card>
             </div>
@@ -889,24 +924,25 @@ export default function AssetDetail() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Financial details for this asset. Values are based on asset configuration.
+                  Financial rules inherited from configuration v{asset.configurationVersion} at time of activation.
+                  These values are locked and cannot be changed retroactively.
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Base Rent</p>
-                    <p className="text-lg font-bold text-foreground">₹{monthlyRent.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+                    <p className="text-lg font-bold text-foreground">₹{asset.monthlyRent?.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Size</p>
-                    <p className="text-lg font-bold text-foreground">{assetData.sizeInTon ?? "N/A"} <span className="text-sm font-normal text-muted-foreground">Ton</span></p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tenure</p>
+                    <p className="text-lg font-bold text-foreground">{asset.tenureMonths} <span className="text-sm font-normal text-muted-foreground">months</span></p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</p>
-                    <p className="text-sm font-semibold text-foreground">{assetData.projectName || "N/A"}</p>
+                    <p className="text-sm font-semibold text-foreground">{asset.projectName}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border/50 space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subproject</p>
-                    <p className="text-sm font-semibold text-foreground">{assetData.subprojectName || "—"}</p>
+                    <p className="text-sm font-semibold text-foreground">{asset.subprojectName || "—"}</p>
                   </div>
                 </div>
               </CardContent>
@@ -923,39 +959,7 @@ export default function AssetDetail() {
                 Full audit trail of all events for this asset
               </p>
             </div>
-            <div className="space-y-4">
-              {auditLogs.length > 0 ? auditLogs.map((log) => (
-                <div key={log.id} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                  <div className="flex flex-col items-center">
-                    <div className="w-3 h-3 rounded-full bg-primary mt-1" />
-                    <div className="w-px flex-1 bg-border mt-1" />
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-foreground">{log.description || log.action}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {typeof log.performedBy === 'string' ? log.performedBy : (log.performedBy?.firstName ? `${log.performedBy.firstName} ${log.performedBy.lastName || ''}`.trim() : 'System')}
-                        </p>
-                      </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(log.timestamp).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {' '}
-                        {new Date(log.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )) : (
-                <Card className="data-card border-border/50">
-                  <CardContent className="flex flex-col items-center justify-center py-16">
-                    <History className="w-16 h-16 text-muted-foreground/30 mb-4" />
-                    <h3 className="text-lg font-medium text-foreground mb-2">No Timeline Events</h3>
-                    <p className="text-sm text-muted-foreground">No audit trail available for this asset yet</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            <AssetLifecycleTimeline events={asset.lifecycleEvents} />
           </div>
         )}
       </div>

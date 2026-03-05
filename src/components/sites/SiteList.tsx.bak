@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ProjectBoundSiteCard } from "./ProjectBoundSiteCard";
 import { AddSiteDialog } from "@/components/forms/AddSiteDialog";
@@ -12,69 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus, Filter, Grid3X3, List, FolderKanban, X } from "lucide-react";
-import { useAppData } from "@/context/AppDataContext";
+import { mockSites, mockProjects, getSubprojectById } from "@/data/mockData";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
-
-interface ProjectOption {
-  id: string;
-  name: string;
-  subprojects: { id: string; name: string }[];
-}
 
 export function SiteList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: appData, loading } = useAppData();
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  
-  // Fetch projects for filter dropdowns
-  useEffect(() => {
-    api.get('/projects')
-      .then(res => {
-        const data = Array.isArray(res.data) ? res.data : [];
-        setProjects(data.map((p: any) => ({
-          id: String(p.id),
-          name: p.name,
-          subprojects: (p.subprojects || []).map((s: any) => ({
-            id: String(s.id),
-            name: s.name,
-          })),
-        })));
-      })
-      .catch(() => {});
-  }, []);
-  
-  // Map sites from AppDataContext into shape ProjectBoundSiteCard expects
-  const sites = useMemo(() => {
-    if (!appData?.sites) return [];
-    return appData.sites.map(s => ({
-      id: String(s.id),
-      name: s.name || "Unnamed Site",
-      location: s.location || s.addressJson || "",
-      stage: (s.currentStage || "WIP") as "Started" | "WTS" | "WIP" | "TIS" | "Installed" | "Live",
-      progress: s.progress ?? 0,
-      acsPlanned: s.acsPlanned ?? s.plannedAcsCount ?? 0,
-      acsInstalled: s.acsInstalled ?? 0,
-      hasDelay: s.hasDelay ?? false,
-      rentStartDate: undefined as string | undefined,
-      projectId: s.projectId ? String(s.projectId) : "",
-      projectName: s.projectName || "",
-      subprojectId: s.subprojectId ? String(s.subprojectId) : "",
-      subprojectName: s.subprojectName || "",
-      configVersion: "1.0",
-      configuredRent: typeof s.configuredRent === 'number' ? s.configuredRent : 0,
-      configuredTenure: typeof s.configuredTenure === 'number' ? s.configuredTenure : 36,
-    }));
-  }, [appData?.sites]);
   
   // Read filters from URL
   const urlProjectId = searchParams.get("projectId") || "";
   const urlSubprojectId = searchParams.get("subprojectId") || "";
   
-  // If we have a subprojectId but no projectId, derive projectId from sites
+  // If we have a subprojectId but no projectId, derive projectId from mockSites
   const derivedProjectId = urlSubprojectId 
-    ? sites.find(s => s.subprojectId === urlSubprojectId)?.projectId || ""
+    ? mockSites.find(s => s.subprojectId === urlSubprojectId)?.projectId || ""
     : urlProjectId;
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,23 +36,16 @@ export function SiteList() {
   const [addSiteOpen, setAddSiteOpen] = useState(false);
 
   // Get subproject info if filtered
-  const subprojectInfo = useMemo(() => {
-    if (!urlSubprojectId) return null;
-    for (const p of projects) {
-      const sub = p.subprojects.find(s => s.id === urlSubprojectId);
-      if (sub) return { project: p, subproject: sub };
-    }
-    return null;
-  }, [urlSubprojectId, projects]);
+  const subprojectInfo = urlSubprojectId ? getSubprojectById(urlSubprojectId) : null;
 
   // Unique projects for filter
-  const projectOptions = projects.map(p => ({ id: p.id, name: p.name }));
+  const projectOptions = mockProjects.map(p => ({ id: p.id, name: p.name }));
   
   // Subprojects for selected project
-  const selectedProject = projects.find(p => p.id === projectFilter);
-  const subprojectOptions = selectedProject?.subprojects || [];
+  const selectedProject = mockProjects.find(p => p.id === projectFilter);
+  const subprojectOptions = selectedProject?.subprojects.map(s => ({ id: s.id, name: s.name })) || [];
 
-  const filteredSites = useMemo(() => sites.filter((site) => {
+  const filteredSites = mockSites.filter((site) => {
     const matchesSearch =
       site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       site.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -110,7 +54,7 @@ export function SiteList() {
     const matchesProject = projectFilter === "all" || site.projectId === projectFilter;
     const matchesSubproject = subprojectFilter === "all" || site.subprojectId === subprojectFilter;
     return matchesSearch && matchesStage && matchesProject && matchesSubproject;
-  }), [sites, searchQuery, stageFilter, projectFilter, subprojectFilter]);
+  });
 
   const stages = ["all", "Started", "WTS", "WIP", "TIS", "Installed", "Live"];
 
@@ -145,16 +89,6 @@ export function SiteList() {
 
   const hasActiveFilters = projectFilter !== "all" || subprojectFilter !== "all";
 
-  if (loading) {
-    return (
-      <div className="p-6 animate-fade-in">
-        <div className="flex items-center justify-center py-16">
-          <div className="text-sm text-muted-foreground">Loading sites...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 animate-fade-in">
       {/* Header */}
@@ -179,6 +113,9 @@ export function SiteList() {
             <span className="text-sm">
               Showing sites for <strong>{subprojectInfo.project.name}</strong> / <strong>{subprojectInfo.subproject.name}</strong>
             </span>
+            <Badge variant="outline" className="text-xs">
+              ₹{subprojectInfo.subproject.configuration.baseMonthlyRent.toLocaleString("en-IN")}/mo • {subprojectInfo.subproject.configuration.tenureMonths}mo tenure
+            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="w-4 h-4 mr-1" />

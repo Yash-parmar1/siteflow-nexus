@@ -8,6 +8,8 @@ interface ACSUnitWithTenure {
   serialNumber: string;
   model: string;
   location: string;
+  isIndoor?: boolean;
+  sizeInTon?: number;
   status: "operational" | "maintenance" | "pending" | "offline" | "decommissioned";
   installDate?: string;
   activationDate?: string;
@@ -91,7 +93,8 @@ export function ACSContractCard({ unit, onClick }: ACSContractCardProps) {
               <span className="font-semibold text-foreground">{unit.serialNumber}</span>
               {unit.hasIssue && <AlertCircle className="w-4 h-4 text-status-error" />}
             </div>
-            <span className="text-xs text-muted-foreground">{unit.model}</span>
+            <span className="text-xs text-muted-foreground">{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</span>
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${unit.isIndoor ? 'bg-[hsl(var(--status-info)/0.15)] text-[hsl(var(--status-info))]' : 'bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]'}`}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</span>
           </div>
         </div>
 

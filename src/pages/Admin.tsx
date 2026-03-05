@@ -33,6 +33,7 @@ import {
   Search, Plus, Users, Shield, Settings, Bell, Database, Activity,
   MoreHorizontal, Mail, Clock, CheckCircle2, XCircle, AlertTriangle,
   Lock, Unlock, UserPlus, Edit, Trash2, RefreshCw, Download, Upload,
+  Undo2, ChevronLeft, ChevronRight, Filter, Eye, AlertCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +42,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // Users are loaded from the backend via /api/admin/users
 // each user: { id, username, firstName, lastName, email, role, active, createdAt }
@@ -94,11 +104,25 @@ export default function Admin() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [pendingUsers, setPendingUsers] = useState<UserType[]>([]);
   const [auditEntries, setAuditEntries] = useState<any[]>([]);
+  const [auditPage, setAuditPage] = useState(0);
+  const [auditTotalPages, setAuditTotalPages] = useState(0);
+  const [auditTotalElements, setAuditTotalElements] = useState(0);
+  const [auditEntityFilter, setAuditEntityFilter] = useState("all");
+  const [auditActionFilter, setAuditActionFilter] = useState("all");
+  const [auditStatusFilter, setAuditStatusFilter] = useState("all");
+  const [auditSearchQuery, setAuditSearchQuery] = useState("");
+  const [auditFilterOptions, setAuditFilterOptions] = useState<{ entityTables: string[]; actions: string[] }>({ entityTables: [], actions: [] });
+  const [revertingId, setRevertingId] = useState<number | null>(null);
+  const [revertConfirmId, setRevertConfirmId] = useState<number | null>(null);
+  const [auditDetailEntry, setAuditDetailEntry] = useState<any | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Record<string,string>>({});
   const [roles, setRoles] = useState<RoleType[]>([]);
 
-  useEffect(() => { fetchUsers(); fetchPending(); fetchLogs(); fetchRoles(); }, []);
+  useEffect(() => { fetchUsers(); fetchPending(); fetchLogs(); fetchRoles(); fetchAuditFilters(); }, []);
+
+  // Re-fetch audit logs when filters change
+  useEffect(() => { fetchLogs(0); }, [auditEntityFilter, auditActionFilter, auditStatusFilter]);
 
   async function fetchRoles() {
     try {
@@ -108,8 +132,6 @@ export default function Admin() {
       console.error('Failed to load roles', err);
     }
   }
-
-  useEffect(() => { fetchUsers(); fetchPending(); fetchLogs(); }, []);
 
   async function fetchUsers() {
     try {
@@ -134,12 +156,45 @@ export default function Admin() {
     }
   }
 
-  async function fetchLogs() {
+  async function fetchLogs(page = 0) {
     try {
-      const resp = await api.get('/admin/logs');
-      setAuditEntries(resp.data || []);
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("size", "30");
+      if (auditEntityFilter !== "all") params.set("entityTable", auditEntityFilter);
+      if (auditActionFilter !== "all") params.set("action", auditActionFilter);
+      if (auditStatusFilter !== "all") params.set("status", auditStatusFilter);
+      const resp = await api.get(`/audit/logs?${params.toString()}`);
+      const data = resp.data;
+      setAuditEntries(data.content || []);
+      setAuditTotalPages(data.totalPages || 0);
+      setAuditTotalElements(data.totalElements || 0);
+      setAuditPage(data.currentPage ?? page);
     } catch (err) {
-      console.error('Failed to load logs', err);
+      console.error('Failed to load audit logs', err);
+    }
+  }
+
+  async function fetchAuditFilters() {
+    try {
+      const resp = await api.get('/audit/filters');
+      setAuditFilterOptions(resp.data || { entityTables: [], actions: [] });
+    } catch (err) {
+      console.error('Failed to load audit filters', err);
+    }
+  }
+
+  async function handleRevert(logId: number) {
+    setRevertingId(logId);
+    try {
+      const resp = await api.post(`/audit/logs/${logId}/revert`);
+      toast.success(`Reverted successfully${resp.data?.cascadeCount ? ` (${resp.data.cascadeCount} cascaded)` : ''}`);
+      setRevertConfirmId(null);
+      fetchLogs(auditPage);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to revert');
+    } finally {
+      setRevertingId(null);
     }
   }
 
@@ -304,12 +359,167 @@ export default function Admin() {
 
         <TabsContent value="audit">
           <Card className="border-border/60">
-            <CardHeader className="pb-3"><div className="flex items-center justify-between"><div><CardTitle className="text-lg">Audit Log</CardTitle><CardDescription>Track all system activities</CardDescription></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={fetchLogs}><RefreshCw className="w-4 h-4" />Refresh</Button><Button variant="outline" size="sm"><Download className="w-4 h-4" />Export</Button></div></div></CardHeader>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Audit Log</CardTitle>
+                  <CardDescription>Track all system activities — {auditTotalElements} total entries</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fetchLogs(auditPage)}>
+                    <RefreshCw className="w-4 h-4" />Refresh
+                  </Button>
+                  <Button variant="outline" size="sm"><Download className="w-4 h-4" />Export</Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            {/* Filters */}
+            <div className="px-6 pb-4 flex flex-wrap gap-3">
+              <Select value={auditEntityFilter} onValueChange={setAuditEntityFilter}>
+                <SelectTrigger className="w-[160px] bg-secondary/50">
+                  <Filter className="w-3.5 h-3.5 mr-1.5" /><SelectValue placeholder="Entity" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="all">All Entities</SelectItem>
+                  {auditFilterOptions.entityTables.map((t) => (
+                    <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={auditActionFilter} onValueChange={setAuditActionFilter}>
+                <SelectTrigger className="w-[160px] bg-secondary/50">
+                  <SelectValue placeholder="Action" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="all">All Actions</SelectItem>
+                  {auditFilterOptions.actions.map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={auditStatusFilter} onValueChange={setAuditStatusFilter}>
+                <SelectTrigger className="w-[130px] bg-secondary/50">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="SUCCESS">Success</SelectItem>
+                  <SelectItem value="FAILURE">Failure</SelectItem>
+                  <SelectItem value="REVERTED">Reverted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <CardContent className="p-0">
-              <Table><TableHeader><TableRow className="hover:bg-transparent border-border"><TableHead>Action</TableHead><TableHead>User</TableHead><TableHead>Timestamp</TableHead><TableHead>IP Address</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                <TableBody>{auditEntries.map((log: any, index) => (<TableRow key={index} className="hover:bg-muted/50 border-border/50"><TableCell className="font-medium">{log.action || log.message || log.type}</TableCell><TableCell>{(log.performedBy && log.performedBy.username) || log.username || log.user || log.performedBy}</TableCell><TableCell className="text-muted-foreground">{log.timestamp || log.performedAt || log.createdAt}</TableCell><TableCell className="text-muted-foreground font-mono text-xs">{log.ip || '-'}</TableCell><TableCell><Badge className={log.status === "Success" ? "bg-[hsl(var(--status-success)/0.15)] text-[hsl(var(--status-success))] border-0" : "bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))] border-0"}>{log.status || log.result || '-'}</Badge></TableCell></TableRow>))}</TableBody>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-border">
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>IP</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditEntries.map((log: any) => {
+                    const userName = log.performedBy
+                      ? (typeof log.performedBy === "object"
+                        ? (log.performedBy.firstName && log.performedBy.lastName
+                          ? `${log.performedBy.firstName} ${log.performedBy.lastName}`
+                          : log.performedBy.username || log.performedBy.email || "System")
+                        : String(log.performedBy))
+                      : "System";
+                    const isReverted = log.reverted === true;
+                    const isRevertable = log.revertable === true && !isReverted;
+                    const actionColor = log.action === "CREATE" ? "text-[hsl(var(--status-success))]"
+                      : log.action === "DELETE" ? "text-[hsl(var(--status-error))]"
+                      : log.action === "REVERT" ? "text-[hsl(var(--status-warning))]"
+                      : log.action === "LOGIN" || log.action === "LOGOUT" ? "text-muted-foreground"
+                      : "text-primary";
+                    const statusColor = log.status === "SUCCESS" ? "bg-[hsl(var(--status-success)/0.15)] text-[hsl(var(--status-success))]"
+                      : log.status === "REVERTED" ? "bg-[hsl(var(--status-warning)/0.15)] text-[hsl(var(--status-warning))]"
+                      : "bg-[hsl(var(--status-error)/0.15)] text-[hsl(var(--status-error))]";
+                    const ts = log.performedAt || log.timestamp;
+                    const formattedTs = ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+                    return (
+                      <TableRow key={log.id} className={`hover:bg-muted/50 border-border/50 ${isReverted ? 'opacity-60' : ''}`}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">#{log.id}</TableCell>
+                        <TableCell>
+                          <span className={`font-semibold text-xs ${actionColor}`}>{log.action}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-medium">{(log.entityTable || '').replace(/_/g, ' ')}</span>
+                            {log.entityId && <span className="text-[10px] text-muted-foreground">#{log.entityId}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <p className="text-sm truncate" title={log.description}>{log.description || '-'}</p>
+                        </TableCell>
+                        <TableCell className="text-sm">{userName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formattedTs}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{log.ipAddress || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={`${statusColor} border-0`}>
+                            {isReverted ? 'Reverted' : log.status || '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon-sm" title="View Details" onClick={() => setAuditDetailEntry(log)}>
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                            {isRevertable && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Revert this action"
+                                className="text-[hsl(var(--status-warning))] hover:text-[hsl(var(--status-warning))]"
+                                onClick={() => setRevertConfirmId(log.id)}
+                                disabled={revertingId === log.id}
+                              >
+                                <Undo2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {auditEntries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                        No audit entries found for the selected filters
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
               </Table>
             </CardContent>
+
+            {/* Pagination */}
+            {auditTotalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+                <span className="text-sm text-muted-foreground">
+                  Page {auditPage + 1} of {auditTotalPages} ({auditTotalElements} entries)
+                </span>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="sm" disabled={auditPage === 0} onClick={() => fetchLogs(auditPage - 1)}>
+                    <ChevronLeft className="w-4 h-4" />Prev
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={auditPage >= auditTotalPages - 1} onClick={() => fetchLogs(auditPage + 1)}>
+                    Next<ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </TabsContent>
 
@@ -329,6 +539,68 @@ export default function Admin() {
         user={selectedUser ? { id: selectedUser.id, name: selectedUser.displayName || selectedUser.username || selectedUser.email, email: selectedUser.email || '' } : null}
         onConfirm={() => { if (selectedUser) deleteUserById(selectedUser.id); }}
       />
+
+      {/* Revert Confirmation Dialog */}
+      <Dialog open={revertConfirmId !== null} onOpenChange={() => setRevertConfirmId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-[hsl(var(--status-warning))]" />
+              Confirm Revert
+            </DialogTitle>
+            <DialogDescription>
+              This will revert audit entry #{revertConfirmId} and cascade-revert any dependent changes.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertConfirmId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={revertingId !== null}
+              onClick={() => { if (revertConfirmId) handleRevert(revertConfirmId); }}
+            >
+              {revertingId ? "Reverting..." : "Revert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Detail Dialog */}
+      <Dialog open={auditDetailEntry !== null} onOpenChange={() => setAuditDetailEntry(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Audit Entry #{auditDetailEntry?.id}</DialogTitle>
+            <DialogDescription>
+              {auditDetailEntry?.action} on {(auditDetailEntry?.entityTable || '').replace(/_/g, ' ')} #{auditDetailEntry?.entityId}
+            </DialogDescription>
+          </DialogHeader>
+          {auditDetailEntry && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">Action</p><Badge variant="outline">{auditDetailEntry.action}</Badge></div>
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">Status</p><Badge variant="outline">{auditDetailEntry.reverted ? 'REVERTED' : auditDetailEntry.status}</Badge></div>
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">User</p><p>{auditDetailEntry.performedBy ? (typeof auditDetailEntry.performedBy === 'object' ? (auditDetailEntry.performedBy.firstName ? `${auditDetailEntry.performedBy.firstName} ${auditDetailEntry.performedBy.lastName}` : auditDetailEntry.performedBy.username) : String(auditDetailEntry.performedBy)) : 'System'}</p></div>
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">IP Address</p><p className="font-mono text-xs">{auditDetailEntry.ipAddress || '-'}</p></div>
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">Timestamp</p><p>{auditDetailEntry.performedAt ? new Date(auditDetailEntry.performedAt).toLocaleString('en-IN') : '-'}</p></div>
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">Entity</p><p>{(auditDetailEntry.entityTable || '').replace(/_/g, ' ')} #{auditDetailEntry.entityId}</p></div>
+              </div>
+              <div><p className="text-xs font-medium text-muted-foreground mb-1">Description</p><p>{auditDetailEntry.description || '-'}</p></div>
+              {auditDetailEntry.oldData && (
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">Old Data</p><pre className="bg-muted/50 p-3 rounded-lg text-xs overflow-x-auto max-h-40">{typeof auditDetailEntry.oldData === 'string' ? auditDetailEntry.oldData : JSON.stringify(auditDetailEntry.oldData, null, 2)}</pre></div>
+              )}
+              {auditDetailEntry.newData && (
+                <div><p className="text-xs font-medium text-muted-foreground mb-1">New Data</p><pre className="bg-muted/50 p-3 rounded-lg text-xs overflow-x-auto max-h-40">{typeof auditDetailEntry.newData === 'string' ? auditDetailEntry.newData : JSON.stringify(auditDetailEntry.newData, null, 2)}</pre></div>
+              )}
+              {auditDetailEntry.reverted && (
+                <div className="p-3 rounded-lg bg-[hsl(var(--status-warning)/0.1)] border border-[hsl(var(--status-warning)/0.2)]">
+                  <p className="text-xs font-medium text-[hsl(var(--status-warning))]">This action was reverted{auditDetailEntry.revertedAt ? ` on ${new Date(auditDetailEntry.revertedAt).toLocaleString('en-IN')}` : ''}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

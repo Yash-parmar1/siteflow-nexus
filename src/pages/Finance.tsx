@@ -19,65 +19,6 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, Re
 import { Separator } from "@/components/ui/separator";
 import GenerateInvoiceTab from "@/components/finance/GenerateInvoiceTab";
 
-// ── Mock data aligned to DB schema ──────────────────────────────
-
-const monthlyTrend = [
-  { month: "Sep", billed: 4200000, collected: 3900000, netCash: 2650000 },
-  { month: "Oct", billed: 4600000, collected: 4100000, netCash: 2800000 },
-  { month: "Nov", billed: 5100000, collected: 4500000, netCash: 3100000 },
-  { month: "Dec", billed: 5300000, collected: 4700000, netCash: 3200000 },
-  { month: "Jan", billed: 5530000, collected: 4979000, netCash: 3500000 },
-  { month: "Feb", billed: 5800000, collected: 5200000, netCash: 3700000 },
-];
-
-const siteFinancials = [
-  { siteId: 1, siteCode: "MUM-001", siteName: "Andheri East Branch", installationBilled: 85000, extraMaterialsBilled: 12000, rentBilled: 180000, totalBilled: 277000, collected: 250000, outstanding: 27000, maintenanceIncluded: true, status: "On Track" },
-  { siteId: 2, siteCode: "MUM-002", siteName: "BKC Tower 3", installationBilled: 120000, extraMaterialsBilled: 25000, rentBilled: 320000, totalBilled: 465000, collected: 465000, outstanding: 0, maintenanceIncluded: false, status: "Paid" },
-  { siteId: 3, siteCode: "DEL-001", siteName: "Connaught Place", installationBilled: 95000, extraMaterialsBilled: 0, rentBilled: 240000, totalBilled: 335000, collected: 200000, outstanding: 135000, maintenanceIncluded: true, status: "Overdue" },
-  { siteId: 4, siteCode: "DEL-002", siteName: "Nehru Place Block B", installationBilled: 110000, extraMaterialsBilled: 18000, rentBilled: 280000, totalBilled: 408000, collected: 350000, outstanding: 58000, maintenanceIncluded: false, status: "Partial" },
-  { siteId: 5, siteCode: "BLR-001", siteName: "Whitefield IT Park", installationBilled: 75000, extraMaterialsBilled: 0, rentBilled: 200000, totalBilled: 275000, collected: 275000, outstanding: 0, maintenanceIncluded: true, status: "Paid" },
-];
-
-const transactions = [
-  { id: 1, direction: "INBOUND", type: "Rent", invoiceRef: "INV-2025-0012", siteCode: "MUM-001", siteName: "Andheri East", amount: 180000, cgst: 16200, sgst: 16200, totalWithGst: 212400, paymentStatus: "Paid", daysOverdue: 0, pdfUrl: "/invoices/INV-2025-0012.pdf", date: "2025-02-01" },
-  { id: 2, direction: "INBOUND", type: "Installation", invoiceRef: "INV-2025-0013", siteCode: "DEL-001", siteName: "Connaught Place", amount: 95000, cgst: 8550, sgst: 8550, totalWithGst: 112100, paymentStatus: "Overdue", daysOverdue: 42, pdfUrl: null, date: "2025-01-10" },
-  { id: 3, direction: "OUTBOUND", type: "Vendor Payment", invoiceRef: "VND-2025-0045", siteCode: "MUM-002", siteName: "BKC Tower 3", amount: 65000, cgst: 5850, sgst: 5850, totalWithGst: 76700, paymentStatus: "Paid", daysOverdue: 0, pdfUrl: "/invoices/VND-2025-0045.pdf", date: "2025-02-05" },
-  { id: 4, direction: "INBOUND", type: "Rent", invoiceRef: "INV-2025-0014", siteCode: "BLR-001", siteName: "Whitefield IT Park", amount: 200000, cgst: 18000, sgst: 18000, totalWithGst: 236000, paymentStatus: "Pending", daysOverdue: 0, pdfUrl: "/invoices/INV-2025-0014.pdf", date: "2025-02-10" },
-  { id: 5, direction: "OUTBOUND", type: "Equipment Purchase", invoiceRef: "PO-2025-0088", siteCode: "DEL-002", siteName: "Nehru Place", amount: 580000, cgst: 52200, sgst: 52200, totalWithGst: 684400, paymentStatus: "Pending", daysOverdue: 0, pdfUrl: null, date: "2025-02-08" },
-  { id: 6, direction: "INBOUND", type: "Extra Materials", invoiceRef: "INV-2025-0015", siteCode: "DEL-002", siteName: "Nehru Place", amount: 18000, cgst: 1620, sgst: 1620, totalWithGst: 21240, paymentStatus: "Partial", daysOverdue: 5, pdfUrl: "/invoices/INV-2025-0015.pdf", date: "2025-01-28" },
-  { id: 7, direction: "OUTBOUND", type: "Logistics", invoiceRef: "LOG-2025-0033", siteCode: "MUM-001", siteName: "Andheri East", amount: 35000, cgst: 3150, sgst: 3150, totalWithGst: 41300, paymentStatus: "Paid", daysOverdue: 0, pdfUrl: null, date: "2025-02-12" },
-];
-
-const overdueAgeing = [
-  { bucket: "1–30 days", amount: 58000, count: 2, color: "hsl(var(--status-warning))" },
-  { bucket: "31–60 days", amount: 95000, count: 1, color: "hsl(38, 70%, 45%)" },
-  { bucket: "61–90 days", amount: 40000, count: 1, color: "hsl(var(--status-error))" },
-  { bucket: "90+ days", amount: 0, count: 0, color: "hsl(0, 50%, 40%)" },
-];
-
-const overdueDetails = [
-  { invoiceRef: "INV-2025-0013", site: "DEL-001 – Connaught Place", client: "DLF Commercial", amount: 95000, dueDate: "2025-01-10", daysOverdue: 42, bucket: "31–60 days" },
-  { invoiceRef: "INV-2025-0015", site: "DEL-002 – Nehru Place", client: "Prestige Estates", amount: 18000, dueDate: "2025-02-19", daysOverdue: 5, bucket: "1–30 days" },
-  { invoiceRef: "INV-2024-0148", site: "MUM-003 – Powai", client: "Metro Properties", amount: 40000, dueDate: "2024-12-15", daysOverdue: 71, bucket: "61–90 days" },
-];
-
-const materialsCost = [
-  { siteCode: "MUM-001", siteName: "Andheri East", material: "Copper Piping 1/4\"", qty: 30, unit: "ft", unitCost: 120, total: 3600, billed: true, maintenanceIncluded: true },
-  { siteCode: "MUM-001", siteName: "Andheri East", material: "Drain Pipe 3/4\"", qty: 20, unit: "ft", unitCost: 85, total: 1700, billed: true, maintenanceIncluded: true },
-  { siteCode: "DEL-002", siteName: "Nehru Place Block B", material: "Wall Bracket (Heavy)", qty: 4, unit: "pcs", unitCost: 1500, total: 6000, billed: true, maintenanceIncluded: false },
-  { siteCode: "DEL-002", siteName: "Nehru Place Block B", material: "Electrical Wiring 2.5mm", qty: 50, unit: "m", unitCost: 45, total: 2250, billed: false, maintenanceIncluded: false },
-  { siteCode: "BLR-001", siteName: "Whitefield IT Park", material: "Gas Charging R32", qty: 2, unit: "kg", unitCost: 800, total: 1600, billed: false, maintenanceIncluded: true },
-  { siteCode: "DEL-001", siteName: "Connaught Place", material: "Stand (Floor)", qty: 2, unit: "pcs", unitCost: 2200, total: 4400, billed: true, maintenanceIncluded: true },
-];
-
-const gstMonthly = [
-  { month: "Oct 2024", cgstCollected: 45000, sgstCollected: 45000, cgstPaid: 12000, sgstPaid: 12000 },
-  { month: "Nov 2024", cgstCollected: 52000, sgstCollected: 52000, cgstPaid: 15000, sgstPaid: 15000 },
-  { month: "Dec 2024", cgstCollected: 48000, sgstCollected: 48000, cgstPaid: 18000, sgstPaid: 18000 },
-  { month: "Jan 2025", cgstCollected: 55000, sgstCollected: 55000, cgstPaid: 14000, sgstPaid: 14000 },
-  { month: "Feb 2025", cgstCollected: 58000, sgstCollected: 58000, cgstPaid: 16500, sgstPaid: 16500 },
-];
-
 // ── Status configs ───────────────────────────────────────────────
 const paymentStatusConfig: Record<string, { class: string }> = {
   Paid: { class: "status-success" },
@@ -99,12 +40,14 @@ const chartConfig = {
   netCash: { label: "Net Cash Flow", color: "hsl(var(--accent))" },
 };
 
-const formatCurrency = (amount: number) =>
-  amount >= 10000000
-    ? `₹${(amount / 10000000).toFixed(2)}Cr`
-    : amount >= 100000
-    ? `₹${(amount / 100000).toFixed(1)}L`
-    : `₹${amount.toLocaleString()}`;
+const formatCurrency = (amount: number | null | undefined) => {
+  const val = amount ?? 0;
+  return val >= 10000000
+    ? `₹${(val / 10000000).toFixed(2)}Cr`
+    : val >= 100000
+    ? `₹${(val / 100000).toFixed(1)}L`
+    : `₹${val.toLocaleString()}`;
+};
 
 export default function Finance() {
   const { toast } = useToast();
@@ -114,7 +57,6 @@ export default function Finance() {
   const [txSearch, setTxSearch] = useState("");
   const [txStatusFilter, setTxStatusFilter] = useState("all");
   const [txDirectionFilter, setTxDirectionFilter] = useState("all");
-  const [materialsFilter, setMaterialsFilter] = useState("All");
   const [siteSearch, setSiteSearch] = useState("");
 
   // ── KPI calculations from live data ──────────────────────────────────
@@ -123,32 +65,112 @@ export default function Finance() {
   const inboundTx = liveTx.filter(t => t.direction === "INBOUND");
   const outboundTx = liveTx.filter(t => t.direction === "OUTBOUND");
   
-  const totalBilled = inboundTx.reduce((s, t) => s + t.amount, 0) || 5530000;
-  const totalCollected = inboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + t.amount, 0) || 4979000;
+  const totalBilled = inboundTx.reduce((s, t) => s + (t.amount ?? 0), 0);
+  const totalCollected = inboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + (t.amount ?? 0), 0);
   const clientOutstanding = totalBilled - totalCollected;
-  const overdueAmount = inboundTx.filter(t => t.paymentStatus === "Overdue").reduce((s, t) => s + t.amount, 0) || 193000;
-  const overdueCount = inboundTx.filter(t => t.paymentStatus === "Overdue").length || 3;
-  const totalOutboundPaid = outboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + t.amount, 0) || 680000;
+  const overdueAmount = inboundTx.filter(t => t.paymentStatus === "Overdue").reduce((s, t) => s + (t.amount ?? 0), 0);
+  const overdueCount = inboundTx.filter(t => t.paymentStatus === "Overdue").length;
+  const totalOutboundPaid = outboundTx.filter(t => t.paymentStatus === "Paid").reduce((s, t) => s + (t.amount ?? 0), 0);
   const netCashPosition = totalCollected - totalOutboundPaid;
-  const thisMonthRevenue = liveFinance?.monthlyRevenue ?? 5800000;
+  const thisMonthRevenue = liveFinance?.monthlyRevenue ?? 0;
 
-  // ── Filtered transactions (use live data if available, else mock) ─────────────────
-  const txSource = liveTx.length > 0 ? liveTx.map(t => ({
+  // ── Derive chart data from transactions ───────────────────────────────
+  const monthlyTrend = useMemo(() => {
+    const monthMap: Record<string, { billed: number; collected: number; netCash: number }> = {};
+    liveTx.forEach(t => {
+      if (!t.date) return;
+      const d = new Date(t.date);
+      const key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+      if (!monthMap[key]) monthMap[key] = { billed: 0, collected: 0, netCash: 0 };
+      if (t.direction === 'INBOUND') {
+        monthMap[key].billed += (t.amount ?? 0);
+        if (t.paymentStatus === 'Paid') monthMap[key].collected += (t.amount ?? 0);
+      }
+      monthMap[key].netCash = monthMap[key].collected - (t.direction === 'OUTBOUND' && t.paymentStatus === 'Paid' ? (t.amount ?? 0) : 0);
+    });
+    return Object.entries(monthMap).map(([month, data]) => ({ month, ...data }));
+  }, [liveTx]);
+
+  // ── Site financials derived from transactions ────────────────────────
+  const siteFinancials = useMemo(() => {
+    const siteMap: Record<string, { siteCode: string; siteName: string; totalBilled: number; collected: number; outstanding: number; status: string }> = {};
+    inboundTx.forEach(t => {
+      const key = t.siteCode || t.siteName || 'Unknown';
+      if (!siteMap[key]) siteMap[key] = { siteCode: t.siteCode || '', siteName: t.siteName || '', totalBilled: 0, collected: 0, outstanding: 0, status: 'On Track' };
+      siteMap[key].totalBilled += (t.amount ?? 0);
+      if (t.paymentStatus === 'Paid') siteMap[key].collected += (t.amount ?? 0);
+    });
+    return Object.values(siteMap).map(s => {
+      s.outstanding = s.totalBilled - s.collected;
+      s.status = s.outstanding === 0 ? 'Paid' : s.outstanding > s.totalBilled * 0.5 ? 'Overdue' : 'Partial';
+      return s;
+    });
+  }, [inboundTx]);
+
+  // ── Overdue ageing ───────────────────────────────────────────────────
+  const overdueAgeing = useMemo(() => {
+    const buckets = [
+      { bucket: "1–30 days", amount: 0, count: 0, color: "hsl(var(--status-warning))" },
+      { bucket: "31–60 days", amount: 0, count: 0, color: "hsl(38, 70%, 45%)" },
+      { bucket: "61–90 days", amount: 0, count: 0, color: "hsl(var(--status-error))" },
+      { bucket: "90+ days", amount: 0, count: 0, color: "hsl(0, 50%, 40%)" },
+    ];
+    inboundTx.filter(t => (t.daysOverdue ?? 0) > 0).forEach(t => {
+      const idx = t.daysOverdue <= 30 ? 0 : t.daysOverdue <= 60 ? 1 : t.daysOverdue <= 90 ? 2 : 3;
+      buckets[idx].amount += (t.amount ?? 0);
+      buckets[idx].count += 1;
+    });
+    return buckets;
+  }, [inboundTx]);
+
+  const overdueDetails = useMemo(() => {
+    return inboundTx.filter(t => t.daysOverdue > 0).map(t => ({
+      invoiceRef: t.invoiceRef || '',
+      site: `${t.siteCode || ''} – ${t.siteName || ''}`,
+      client: t.siteName || '',
+      amount: t.amount,
+      dueDate: t.date || '',
+      daysOverdue: t.daysOverdue,
+      bucket: t.daysOverdue <= 30 ? '1–30 days' : t.daysOverdue <= 60 ? '31–60 days' : t.daysOverdue <= 90 ? '61–90 days' : '90+ days',
+    }));
+  }, [inboundTx]);
+
+  // ── GST data derived from transactions ────────────────────────────────
+  const gstMonthly = useMemo(() => {
+    const gstMap: Record<string, { cgstCollected: number; sgstCollected: number; cgstPaid: number; sgstPaid: number }> = {};
+    liveTx.forEach(t => {
+      if (!t.date) return;
+      const d = new Date(t.date);
+      const key = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+      if (!gstMap[key]) gstMap[key] = { cgstCollected: 0, sgstCollected: 0, cgstPaid: 0, sgstPaid: 0 };
+      if (t.direction === 'INBOUND') {
+        gstMap[key].cgstCollected += (t.cgst ?? 0);
+        gstMap[key].sgstCollected += (t.sgst ?? 0);
+      } else {
+        gstMap[key].cgstPaid += (t.cgst ?? 0);
+        gstMap[key].sgstPaid += (t.sgst ?? 0);
+      }
+    });
+    return Object.entries(gstMap).map(([month, data]) => ({ month, ...data }));
+  }, [liveTx]);
+
+  // ── Transaction source (always live) ─────────────────────────────────
+  const txSource = liveTx.map(t => ({
     id: t.id,
     direction: t.direction,
     type: t.type,
     invoiceRef: t.invoiceRef || "",
     siteCode: t.siteCode || "",
     siteName: t.siteName || "",
-    amount: t.amount,
-    cgst: t.cgst,
-    sgst: t.sgst,
-    totalWithGst: t.totalWithGst,
+    amount: t.amount ?? 0,
+    cgst: t.cgst ?? 0,
+    sgst: t.sgst ?? 0,
+    totalWithGst: t.totalWithGst ?? 0,
     paymentStatus: t.paymentStatus,
     daysOverdue: t.daysOverdue,
     pdfUrl: t.pdfUrl,
     date: t.date,
-  })) : transactions;
+  }));
 
   const filteredTx = useMemo(() => {
     return txSource.filter((t) => {
@@ -169,22 +191,11 @@ export default function Finance() {
         s.siteCode.toLowerCase().includes(siteSearch.toLowerCase()) ||
         s.siteName.toLowerCase().includes(siteSearch.toLowerCase())
     );
-  }, [siteSearch]);
+  }, [siteSearch, siteFinancials]);
 
-  // ── Filtered materials ────────────────────────────────────────
-  const filteredMaterials = useMemo(() => {
-    if (materialsFilter === "Billed") return materialsCost.filter((m) => m.billed);
-    if (materialsFilter === "Unbilled") return materialsCost.filter((m) => !m.billed);
-    return materialsCost;
-  }, [materialsFilter]);
-
-  const materialTotals = useMemo(() => {
-    const grouped: Record<string, number> = {};
-    filteredMaterials.forEach((m) => {
-      grouped[m.material] = (grouped[m.material] || 0) + m.total;
-    });
-    return grouped;
-  }, [filteredMaterials]);
+  // ── No materials data from backend yet - show empty ───────────
+  const filteredMaterials: any[] = [];
+  const materialTotals: Record<string, number> = {};
 
   const handleExport = () => toast({ title: "Export started", description: "Downloading finance data..." });
   const handleImport = () => setShowImportDialog(true);
@@ -231,7 +242,7 @@ export default function Finance() {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <KpiCard icon={IndianRupee} iconColor="text-primary" label="Total Billed" sublabel="INBOUND" value={formatCurrency(totalBilled)} />
-            <KpiCard icon={CheckCircle2} iconColor="text-[hsl(var(--status-success))]" label="Total Collected" value={formatCurrency(totalCollected)} trend={`${Math.round((totalCollected / totalBilled) * 100)}% of billed`} />
+            <KpiCard icon={CheckCircle2} iconColor="text-[hsl(var(--status-success))]" label="Total Collected" value={formatCurrency(totalCollected)} trend={totalBilled > 0 ? `${Math.round((totalCollected / totalBilled) * 100)}% of billed` : "—"} />
             <KpiCard icon={Clock} iconColor="text-[hsl(var(--status-warning))]" label="Client Outstanding" value={formatCurrency(clientOutstanding)} valueColor="text-[hsl(var(--status-warning))]" />
             <KpiCard icon={AlertTriangle} iconColor="text-[hsl(var(--status-error))]" label="Overdue Amount" value={formatCurrency(overdueAmount)} valueColor="text-[hsl(var(--status-error))]" badge={`${overdueCount}`} />
             <KpiCard icon={Wallet} iconColor="text-accent" label="Net Cash Position" value={formatCurrency(netCashPosition)} trend="collected − outbound" />
@@ -274,47 +285,35 @@ export default function Finance() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-border">
                   <TableHead>Site</TableHead>
-                  <TableHead className="text-right">Installation</TableHead>
-                  <TableHead className="text-right">Extra Materials</TableHead>
-                  <TableHead className="text-right">Rent</TableHead>
                   <TableHead className="text-right">Total Billed</TableHead>
                   <TableHead className="text-right">Collected</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
-                  <TableHead className="text-center">Maint. Incl.</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSites.map((s) => (
-                  <TableRow key={s.siteId} className="hover:bg-muted/50 border-border/50">
+                {filteredSites.length > 0 ? filteredSites.map((s, i) => (
+                  <TableRow key={i} className="hover:bg-muted/50 border-border/50">
                     <TableCell>
                       <div>
-                        <p className="font-medium">{s.siteCode}</p>
+                        <p className="font-medium">{s.siteCode || s.siteName}</p>
                         <p className="text-xs text-muted-foreground">{s.siteName}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(s.installationBilled)}</TableCell>
-                    <TableCell className={`text-right ${s.maintenanceIncluded ? "text-muted-foreground/40" : ""}`}>
-                      {s.maintenanceIncluded ? <span className="italic">N/A</span> : formatCurrency(s.extraMaterialsBilled)}
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(s.rentBilled)}</TableCell>
                     <TableCell className="text-right font-semibold">{formatCurrency(s.totalBilled)}</TableCell>
                     <TableCell className="text-right text-[hsl(var(--status-success))]">{formatCurrency(s.collected)}</TableCell>
                     <TableCell className={`text-right font-medium ${s.outstanding > 0 ? "text-[hsl(var(--status-warning))]" : ""}`}>
                       {formatCurrency(s.outstanding)}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {s.maintenanceIncluded ? (
-                        <Badge className="status-success border-0 text-[10px]">Yes</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px]">No</Badge>
-                      )}
-                    </TableCell>
                     <TableCell>
                       <Badge className={`${siteStatusConfig[s.status]?.class || "status-neutral"} border-0`}>{s.status}</Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No site financial data available</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
@@ -478,81 +477,15 @@ export default function Finance() {
 
         {/* ═══════════════ TAB 5: MATERIALS COST ═══════════════ */}
         <TabsContent value="materials" className="space-y-4">
-          <div className="flex gap-2 items-center">
-            <TabsList className="bg-secondary/50 h-8">
-              {["All", "Unbilled", "Billed"].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setMaterialsFilter(f)}
-                  className={`px-3 py-1 text-xs rounded-sm font-medium transition-colors ${materialsFilter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {f}
-                </button>
-              ))}
-            </TabsList>
-          </div>
-
           <Card className="border-border/60">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-border">
-                  <TableHead>Site</TableHead>
-                  <TableHead>Material</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead className="text-right">Unit Cost</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Billed?</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMaterials.map((m, i) => (
-                  <TableRow key={i} className="hover:bg-muted/50 border-border/50">
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-xs">{m.siteCode}</p>
-                        <p className="text-[11px] text-muted-foreground">{m.siteName}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{m.material}</TableCell>
-                    <TableCell className="text-right">{m.qty}</TableCell>
-                    <TableCell className="text-muted-foreground">{m.unit}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(m.unitCost)}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(m.total)}</TableCell>
-                    <TableCell>
-                      {m.billed ? (
-                        <Badge className="status-success border-0 text-[10px]">Billed</Badge>
-                      ) : (
-                        <Badge className="status-warning border-0 text-[10px]">Unbilled</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {/* Aggregate footer */}
-                <TableRow className="bg-muted/30 border-border font-medium">
-                  <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">Aggregate Totals by Material →</TableCell>
-                  <TableCell colSpan={2}></TableCell>
-                </TableRow>
-                {Object.entries(materialTotals).map(([mat, total]) => (
-                  <TableRow key={mat} className="bg-muted/20 border-border/30">
-                    <TableCell colSpan={5} className="text-right text-xs">{mat}</TableCell>
-                    <TableCell className="text-right font-semibold text-xs">{formatCurrency(total)}</TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-
-          {/* Maintenance-excluded banner for sites where maintenance is included */}
-          {filteredMaterials.some((m) => m.maintenanceIncluded && !m.billed) && (
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--status-info)/0.1)] border border-[hsl(var(--status-info)/0.2)]">
-              <AlertTriangle className="w-4 h-4 text-[hsl(var(--status-info))] shrink-0" />
-              <p className="text-xs text-[hsl(var(--status-info))]">
-                Some sites with maintenance-included configurations have unbilled extra materials. No separate invoice was generated for these materials.
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">Materials Cost Tracking</h3>
+              <p className="text-sm text-muted-foreground text-center max-w-md">
+                Materials cost data will appear here once material usage is tracked per site through installations and maintenance.
               </p>
-            </div>
-          )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ═══════════════ TAB 6: GST REPORT ═══════════════ */}

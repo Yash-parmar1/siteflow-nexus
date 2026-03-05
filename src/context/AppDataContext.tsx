@@ -74,6 +74,10 @@ export interface AssetData {
   firstMonthRent: number | null;
   siteId: number | null;
   siteName: string | null;
+  subprojectId: number | null;
+  subprojectName: string | null;
+  projectId: number | null;
+  projectName: string | null;
 }
 
 export interface InstallationData {
@@ -92,6 +96,8 @@ export interface InstallationData {
   receiverName: string | null;
   receiverNumber: string | null;
   remarks: string | null;
+  serialNumberImageUrl: string | null;
+  evidenceImagesJson: string | null;
   createdAt: string;
   updatedAt: string | null;
 }

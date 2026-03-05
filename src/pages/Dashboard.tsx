@@ -116,7 +116,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground">{log.description || `${log.action} on ${log.entityTable}`}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Clock className="w-3 h-3" />{formatTime(log.timestamp)}{log.performedBy && <span> · {log.performedBy}</span>}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Clock className="w-3 h-3" />{formatTime(log.timestamp)}{log.performedBy && <span> · {typeof log.performedBy === 'string' ? log.performedBy : (log.performedBy.firstName ? `${log.performedBy.firstName} ${log.performedBy.lastName}` : log.performedBy.username)}</span>}</p>
                   </div>
                 </div>
               );

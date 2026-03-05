@@ -90,8 +90,16 @@ export function EvidenceGallery({
               onClick={() => setSelectedImage(photo)}
               className="group relative aspect-square rounded-lg overflow-hidden bg-secondary/50 border border-border/50 hover:border-primary/50 transition-all"
             >
-              {/* Placeholder for actual image */}
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-secondary to-muted">
+              {/* Actual image or placeholder */}
+              {(photo.url || photo.thumbnailUrl) ? (
+                <img
+                  src={photo.url || photo.thumbnailUrl}
+                  alt={photo.caption || photo.fileName || 'Evidence photo'}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                />
+              ) : null}
+              <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-secondary to-muted ${(photo.url || photo.thumbnailUrl) ? 'hidden' : ''}`}>
                 <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
               </div>
               
@@ -190,13 +198,16 @@ export function EvidenceGallery({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.open(`/uploads/${doc.fileUrl}`, '_blank')}
+                  onClick={() => {
+                    const url = doc.fileUrl?.startsWith('http') ? doc.fileUrl : `/uploads/${doc.fileUrl}`;
+                    window.open(url, '_blank');
+                  }}
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   View
                 </Button>
                 <Button variant="ghost" size="sm" asChild>
-                  <a href={`/uploads/${doc.fileUrl}`} download={doc.fileName}>
+                  <a href={doc.fileUrl?.startsWith('http') ? doc.fileUrl : `/uploads/${doc.fileUrl}`} download={doc.fileName} target="_blank" rel="noopener noreferrer">
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </a>
@@ -220,8 +231,16 @@ export function EvidenceGallery({
           <DialogHeader>
             <DialogTitle>{selectedImage?.caption || selectedImage?.fileName}</DialogTitle>
           </DialogHeader>
-          <div className="relative aspect-video bg-secondary rounded-lg flex items-center justify-center">
-            <ImageIcon className="w-16 h-16 text-muted-foreground/50" />
+          <div className="relative aspect-video bg-secondary rounded-lg flex items-center justify-center overflow-hidden">
+            {(selectedImage?.url || selectedImage?.thumbnailUrl) ? (
+              <img
+                src={selectedImage.url || selectedImage.thumbnailUrl}
+                alt={selectedImage?.caption || selectedImage?.fileName || 'Evidence'}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <ImageIcon className="w-16 h-16 text-muted-foreground/50" />
+            )}
           </div>
           {selectedImage && (
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">

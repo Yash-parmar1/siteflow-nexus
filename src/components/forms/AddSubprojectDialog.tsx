@@ -332,7 +332,7 @@ export function AddSubprojectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />
@@ -591,7 +591,7 @@ export function AddSubprojectDialog({
             </div>
 
             {/* ── Sticky Footer ── */}
-            <DialogFooter className="px-6 py-4 border-t border-border bg-card sticky bottom-0">
+            <DialogFooter className="px-6 py-4 border-t border-border bg-card shrink-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Creating..." : "Create & Lock Configuration"}

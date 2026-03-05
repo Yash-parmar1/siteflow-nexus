@@ -11,10 +11,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   Search, Plus, Filter, Truck, Package, MapPin, Calendar, MoreHorizontal,
-  Download, CheckCircle2, Clock, AlertCircle, ArrowRight, FileText, Camera, Upload, Pencil,
+  Download, CheckCircle2, Clock, AlertCircle, ArrowRight, FileText, Camera, Upload, Pencil, Eye, X,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAppData, type InstallationData } from "@/context/AppDataContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
 
 const statusConfig: Record<string, { color: string; bgColor: string }> = {
   "Pending Dispatch": { color: "text-muted-foreground", bgColor: "bg-muted" },
@@ -39,7 +41,49 @@ export default function Installations() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedInst, setSelectedInst] = useState<{ id: string; name: string } | null>(null);
+  const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+  const [evidenceDialogData, setEvidenceDialogData] = useState<{ photos: any[]; documents: any[]; title: string }>({ photos: [], documents: [], title: "" });
   const { data: appData, refresh } = useAppData();
+
+  // Parse evidence for an installation
+  const openEvidence = (inst: InstallationData) => {
+    const photos: any[] = [];
+    const documents: any[] = [];
+    if (inst.evidenceImagesJson) {
+      try {
+        const urls = JSON.parse(inst.evidenceImagesJson);
+        if (Array.isArray(urls)) {
+          urls.forEach((url: string, i: number) => {
+            photos.push({
+              id: `photo-${i}`,
+              url,
+              thumbnailUrl: url,
+              fileName: url.split('/').pop() || `photo-${i}.jpg`,
+              fileSize: 0,
+              mimeType: "image/jpeg",
+              uploadedAt: inst.createdAt || new Date().toISOString(),
+              uploadedBy: "System",
+            });
+          });
+        }
+      } catch {}
+    }
+    if (inst.serialNumberImageUrl) {
+      documents.push({
+        id: "serial-img",
+        fileUrl: inst.serialNumberImageUrl,
+        fileName: "serial-number.jpg",
+        fileSize: 0,
+        mimeType: "image/jpeg",
+        uploadedAt: inst.createdAt || new Date().toISOString(),
+        uploadedBy: "System",
+        documentType: "Serial Number",
+        description: "Serial number image",
+      });
+    }
+    setEvidenceDialogData({ photos, documents, title: inst.bookingId || `Installation #${inst.id}` });
+    setEvidenceDialogOpen(true);
+  };
 
   // Map live installation data from backend
   const installations = (appData?.installations || []).map((inst: InstallationData) => ({
@@ -64,6 +108,8 @@ export default function Installations() {
     priority: "Medium",
     notes: inst.remarks ?? "",
     acAssetSerial: inst.acAssetSerial ?? "",
+    hasEvidence: !!(inst.serialNumberImageUrl || inst.evidenceImagesJson),
+    _raw: inst,
   }));
 
   const filteredInstallations = installations.filter((inst) => {
@@ -147,6 +193,11 @@ export default function Installations() {
                   {inst.notes && <p className="mt-3 text-sm text-muted-foreground italic">"{inst.notes}"</p>}
                 </div>
                 <div className="flex lg:flex-col gap-2 shrink-0">
+                  {inst.hasEvidence && (
+                    <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => { e.stopPropagation(); openEvidence(inst._raw); }}>
+                      <Camera className="w-4 h-4" />Evidence
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => { e.stopPropagation(); setSelectedInst({ id: inst.id, name: inst.docketId }); setEditOpen(true); }}>
                     <Pencil className="w-4 h-4" />Edit
                   </Button>
@@ -179,6 +230,21 @@ export default function Installations() {
           onSuccess={refresh}
         />
       )}
+
+      {/* Evidence Dialog */}
+      <Dialog open={evidenceDialogOpen} onOpenChange={setEvidenceDialogOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Installation Evidence — {evidenceDialogData.title}</DialogTitle>
+          </DialogHeader>
+          <EvidenceGallery
+            photos={evidenceDialogData.photos}
+            videos={[]}
+            documents={evidenceDialogData.documents}
+            readOnly
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

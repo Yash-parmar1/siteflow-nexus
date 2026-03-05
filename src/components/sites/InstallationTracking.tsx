@@ -13,6 +13,7 @@ interface Installation {
 
 interface InstallationTrackingProps {
   installations: Installation[];
+  onViewEvidence?: (installationId: string) => void;
 }
 
 const shipmentStatusConfig = {
@@ -23,7 +24,7 @@ const shipmentStatusConfig = {
   installed: { label: "Installed", color: "status-success", icon: FileCheck },
 };
 
-export function InstallationTracking({ installations }: InstallationTrackingProps) {
+export function InstallationTracking({ installations, onViewEvidence }: InstallationTrackingProps) {
   return (
     <div className="data-card">
       <div className="flex items-center justify-between mb-5">
@@ -92,7 +93,10 @@ export function InstallationTracking({ installations }: InstallationTrackingProp
               </div>
 
               {installation.hasEvidence && (
-                <button className="text-sm text-primary hover:text-primary/80 shrink-0 transition-colors">
+                <button
+                  className="text-sm text-primary hover:text-primary/80 shrink-0 transition-colors"
+                  onClick={() => onViewEvidence?.(installation.id)}
+                >
                   View Evidence
                 </button>
               )}

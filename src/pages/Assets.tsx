@@ -55,6 +55,8 @@ export default function Assets() {
       : a.status === "PENDING" ? "Pending Install"
       : a.status === "IN_TRANSIT" ? "In Transit"
       : a.status ?? "Operational",
+    isIndoor: a.indoorAc,
+    sizeInTon: a.sizeInTon,
     lastMaintenance: a.lastMaintenanceDate ?? "-",
     nextMaintenance: a.nextMaintenanceDate ?? "-",
     warrantyExpiry: a.warrantyExpiryDate ?? "-",
@@ -131,6 +133,7 @@ export default function Assets() {
               <TableRow className="hover:bg-transparent border-border">
                 <TableHead>Serial Number</TableHead>
                 <TableHead>Model</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Site</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Rent</TableHead>
@@ -141,7 +144,8 @@ export default function Assets() {
               {filteredUnits.map((unit) => (
                 <TableRow key={unit.id} className="cursor-pointer hover:bg-muted/50 border-border/50" onClick={() => navigate(`/assets/${unit.id}`)}>
                   <TableCell className="font-medium">{unit.serialNumber}</TableCell>
-                  <TableCell>{unit.model}</TableCell>
+                  <TableCell>{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</TableCell>
+                  <TableCell><Badge variant="outline" className={unit.isIndoor ? 'border-[hsl(var(--status-info))] text-[hsl(var(--status-info))]' : 'border-[hsl(var(--status-warning))] text-[hsl(var(--status-warning))]'}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</Badge></TableCell>
                   <TableCell><div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />{unit.siteName}</div></TableCell>
                   <TableCell><span className={`status-badge ${statusConfig[unit.status]?.color}`}>{statusConfig[unit.status]?.icon}{unit.status}</span></TableCell>
                   <TableCell className="font-medium">₹{unit.configuredRent.toLocaleString("en-IN")}</TableCell>
@@ -172,7 +176,8 @@ export default function Assets() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-semibold text-foreground">{unit.serialNumber}</p>
-                    <p className="text-xs text-muted-foreground">{unit.model}</p>
+                    <p className="text-xs text-muted-foreground">{unit.model}{unit.sizeInTon ? ` (${unit.sizeInTon}T)` : ''}</p>
+                    <Badge variant="outline" className={`mt-1 text-[10px] h-4 ${unit.isIndoor ? 'border-[hsl(var(--status-info))] text-[hsl(var(--status-info))]' : 'border-[hsl(var(--status-warning))] text-[hsl(var(--status-warning))]'}`}>{unit.isIndoor ? 'Indoor' : 'Outdoor'}</Badge>
                   </div>
                   <span className={`status-badge ${statusConfig[unit.status]?.color}`}>{statusConfig[unit.status]?.icon}{unit.status}</span>
                 </div>
