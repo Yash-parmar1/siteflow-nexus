@@ -120,6 +120,23 @@ export interface FinanceSummary {
   netProfit: number;
 }
 
+export interface FinancialTransaction {
+  id: number;
+  direction: string;
+  type: string;
+  invoiceRef: string | null;
+  siteCode: string | null;
+  siteName: string | null;
+  amount: number;
+  cgst: number;
+  sgst: number;
+  totalWithGst: number;
+  paymentStatus: string;
+  daysOverdue: number;
+  pdfUrl: string | null;
+  date: string;
+}
+
 export interface AppData {
   dashboard: DashboardMetrics;
   sites: SiteData[];
@@ -127,6 +144,7 @@ export interface AppData {
   installations: InstallationData[];
   maintenanceTickets: TicketData[];
   finance: FinanceSummary;
+  financialTransactions: FinancialTransaction[];
 }
 
 interface AppDataContextType {
@@ -146,6 +164,7 @@ const EMPTY_APP_DATA: AppData = {
   installations: [],
   maintenanceTickets: [],
   finance: { monthlyRevenue: 0, totalMaintenanceCost: 0, totalInstallationCost: 0, netProfit: 0 },
+  financialTransactions: [],
 };
 
 export const AppDataProvider = ({ children }: { children: ReactNode }) => {
