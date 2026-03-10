@@ -86,6 +86,7 @@ export default function AssetDetail() {
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [evidencePhotos, setEvidencePhotos] = useState<any[]>([]);
+  const [evidenceVideos, setEvidenceVideos] = useState<any[]>([]);
   const [evidenceDocuments, setEvidenceDocuments] = useState<any[]>([]);
 
   // Find asset from context
@@ -119,13 +120,37 @@ export default function AssetDetail() {
       try {
         const urls = JSON.parse(installation.evidenceImagesJson as string);
         if (Array.isArray(urls)) {
-          setEvidencePhotos(urls.map((url: string, i: number) => ({
+          const videoExtensions = ['.mp4', '.mov', '.webm', '.avi', '.mkv'];
+          const photoUrls: string[] = [];
+          const videoUrls: string[] = [];
+          
+          urls.forEach((url: string) => {
+            const lower = url.toLowerCase();
+            if (videoExtensions.some(ext => lower.includes(ext))) {
+              videoUrls.push(url);
+            } else {
+              photoUrls.push(url);
+            }
+          });
+          
+          setEvidencePhotos(photoUrls.map((url: string, i: number) => ({
             id: `photo-${i}`,
             url,
             thumbnailUrl: url,
             fileName: url.split('/').pop() || `photo-${i}.jpg`,
             fileSize: 0,
             mimeType: "image/jpeg",
+            uploadedAt: installation.createdAt || new Date().toISOString(),
+            uploadedBy: "System",
+          })));
+          
+          setEvidenceVideos(videoUrls.map((url: string, i: number) => ({
+            id: `video-${i}`,
+            url,
+            thumbnailUrl: url,
+            fileName: url.split('/').pop() || `video-${i}.mp4`,
+            fileSize: 0,
+            mimeType: "video/mp4",
             uploadedAt: installation.createdAt || new Date().toISOString(),
             uploadedBy: "System",
           })));
@@ -382,9 +407,21 @@ export default function AssetDetail() {
                       </p>
                     </div>
                     <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sell Price</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {assetData.sellPrice ? `₹${assetData.sellPrice.toLocaleString()}` : "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Model No.</p>
                       <p className="text-lg font-semibold text-foreground">
                         {assetData.modelNumber || assetData.model || "N/A"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">First Month Rent</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {assetData.firstMonthRent ? `₹${assetData.firstMonthRent.toLocaleString()}` : "N/A"}
                       </p>
                     </div>
                   </div>
@@ -593,7 +630,7 @@ export default function AssetDetail() {
                       <p className="text-xs font-medium text-muted-foreground mt-1">Photos</p>
                     </div>
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
-                      <p className="text-2xl font-bold text-foreground">0</p>
+                      <p className="text-2xl font-bold text-foreground">{evidenceVideos.length}</p>
                       <p className="text-xs font-medium text-muted-foreground mt-1">Videos</p>
                     </div>
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 text-center">
@@ -693,7 +730,7 @@ export default function AssetDetail() {
                 </Card>
 
                 {/* Evidence from installation */}
-                {(evidencePhotos.length > 0 || evidenceDocuments.length > 0) && (
+                {(evidencePhotos.length > 0 || evidenceVideos.length > 0 || evidenceDocuments.length > 0) && (
                   <Card className="data-card border-border/50 shadow-sm">
                     <CardHeader>
                       <CardTitle className="text-lg">Installation Evidence</CardTitle>
@@ -701,7 +738,7 @@ export default function AssetDetail() {
                     <CardContent>
                       <EvidenceGallery
                         photos={evidencePhotos}
-                        videos={[]}
+                        videos={evidenceVideos}
                         documents={evidenceDocuments}
                         readOnly
                       />
@@ -820,10 +857,10 @@ export default function AssetDetail() {
               <h2 className="text-2xl font-semibold text-foreground">Evidence & Documentation</h2>
               <p className="text-muted-foreground mt-1">Photos, videos, and documents related to this asset</p>
             </div>
-            {(evidencePhotos.length > 0 || evidenceDocuments.length > 0) ? (
+            {(evidencePhotos.length > 0 || evidenceVideos.length > 0 || evidenceDocuments.length > 0) ? (
               <EvidenceGallery
                 photos={evidencePhotos}
-                videos={[]}
+                videos={evidenceVideos}
                 documents={evidenceDocuments}
                 readOnly={false}
                 onUpload={(type) => console.log("Upload:", type)}
@@ -861,6 +898,13 @@ export default function AssetDetail() {
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Purchase Cost</p>
                   <p className="text-3xl font-bold text-foreground">{assetData.purchaseCost ? `₹${assetData.purchaseCost.toLocaleString()}` : 'N/A'}</p>
                   <p className="text-xs text-muted-foreground">one-time</p>
+                </CardContent>
+              </Card>
+              <Card className="data-card border-border/50 shadow-sm">
+                <CardContent className="p-6 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sell Price</p>
+                  <p className="text-3xl font-bold text-foreground">{assetData.sellPrice ? `₹${assetData.sellPrice.toLocaleString()}` : 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground">to client</p>
                 </CardContent>
               </Card>
               <Card className="data-card border-status-error/20 shadow-sm bg-status-error/5">

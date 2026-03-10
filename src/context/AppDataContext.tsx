@@ -60,6 +60,7 @@ export interface AssetData {
   manufacturer: string | null;
   model: string | null;
   purchaseCost: number | null;
+  sellPrice: number | null;
   insuranceThreshold: number | null;
   maintenanceSupported: boolean;
   status: string;

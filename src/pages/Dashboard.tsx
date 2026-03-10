@@ -57,7 +57,10 @@ export default function Dashboard() {
     api.get('/audit/logs?page=0&size=10')
       .then((res) => {
         const logs = res.data?.content || res.data || [];
-        setRecentActivity(Array.isArray(logs) ? logs.slice(0, 6) : []);
+        const filtered = Array.isArray(logs) 
+          ? logs.filter(log => !['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGIN_PENDING', 'REGISTER'].includes(log.action))
+          : [];
+        setRecentActivity(filtered.slice(0, 6));
       })
       .catch(() => {});
   }, []);

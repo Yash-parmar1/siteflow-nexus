@@ -128,26 +128,33 @@ export function EvidenceGallery({
 
       {/* Videos List */}
       {activeTab === "videos" && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {videos.map((video) => (
             <div
               key={video.id}
-              className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 border border-border/50 hover:border-border transition-all"
+              className="rounded-lg bg-secondary/30 border border-border/50 hover:border-border transition-all overflow-hidden"
             >
-              <div className="w-24 h-16 rounded bg-secondary flex items-center justify-center shrink-0">
-                <Video className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{video.fileName}</p>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                  <span>{(video.fileSize / 1024 / 1024).toFixed(1)} MB</span>
-                  <span>•</span>
-                  <span>{new Date(video.uploadedAt).toLocaleDateString()}</span>
+              <video
+                controls
+                className="w-full max-h-[400px] bg-black"
+                preload="metadata"
+              >
+                <source src={video.url} type={video.mimeType || "video/mp4"} />
+                Your browser does not support the video tag.
+              </video>
+              <div className="flex items-center gap-4 p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">{video.fileName}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    <span>{new Date(video.uploadedAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
+                <Button variant="ghost" size="icon-sm" asChild>
+                  <a href={video.url} download={video.fileName} target="_blank" rel="noopener noreferrer">
+                    <Download className="w-4 h-4" />
+                  </a>
+                </Button>
               </div>
-              <Button variant="ghost" size="icon-sm">
-                <Download className="w-4 h-4" />
-              </Button>
             </div>
           ))}
 

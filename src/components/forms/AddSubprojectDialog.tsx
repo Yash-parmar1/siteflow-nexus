@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Lock, IndianRupee, Calendar, Wrench, Upload, FileText, Image, File, X,
-  Percent, Package, ShoppingCart, Tag, Pencil, Loader2, FileSpreadsheet, Download,
+  Percent, Package, ShoppingCart, Tag, Pencil, Loader2, FileSpreadsheet, Download, CheckCircle2,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -130,7 +130,7 @@ function RequiredPdfDropzone({ label, file, onFile, onRemove }: {
 }
 
 // ── Locked Section (file-upload → auto-fill) ────────────────────
-function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, sampleFilename, onFileSelected }: {
+function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, sampleFilename, onFileSelected, configType }: {
   title: string;
   icon: React.ElementType;
   fields: { label: string; name: string; value: number | undefined; onChange: (v: number) => void }[];
@@ -138,30 +138,108 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
   sampleUrl?: string;
   sampleFilename?: string;
   onFileSelected?: (file: File | null) => void;
+  configType?: "sell-price" | "cost-price" | "asset-values" | "rent-schedule";
 }) {
   const [locked, setLocked] = useState(true);
   const [uploadedFile, setUploadedFile] = useState<FileWithPreview | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [parsedPreview, setParsedPreview] = useState<string | null>(null);
+  const [parsedItems, setParsedItems] = useState<Record<string, unknown>[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
 
   const handleProcess = async () => {
-    if (!uploadedFile) return;
+    if (!uploadedFile || !configType) return;
     setProcessing(true);
-    // Simulate parsing file — actual upload happens after subproject creation
-    await new Promise((r) => setTimeout(r, 800));
-    setProcessing(false);
-    toast.success(`${title} file ready — will be processed on submit`);
+    setParsedPreview(null);
+    setParsedItems([]);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadedFile.file);
+
+      const response = await api.post(`/config/preview/${configType}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      // Defensive check: ensure response and response.data exist
+      if (!response || typeof response !== 'object') {
+        toast.error('Invalid server response');
+        return;
+      }
+
+      const data = response.data;
+      
+      // Check for null, undefined, or empty responses
+      if (data === null || data === undefined) {
+        toast.error('No data returned from server');
+        return;
+      }
+      
+      if (Array.isArray(data)) {
+        // For sell-price and cost-price (returns array of items)
+        setParsedItems(data);
+        setParsedPreview(`Parsed ${data.length} items successfully`);
+        if (data.length > 0) {
+          toast.success(`✓ Parsed ${data.length} items`);
+          setLocked(false);
+        }
+      } else if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+        // For asset-values and rent-schedule (returns object with scalar values)
+        // Double-check it's a plain object
+        try {
+          const entries = Object.entries(data).filter(([_, v]) => v !== null && v !== undefined); 
+          entries.forEach(([key, value]) => {
+            const field = fields.find(f => f.name === key);
+            if (field && (typeof value === 'number' || (typeof value === 'object' && value && typeof value.constructor === 'function'))) {
+              // Handle both numbers and BigDecimal objects
+              const numValue = typeof value === 'number' ? value : Number(value);
+              field.onChange(numValue);
+            }
+          });
+          if (entries.length > 0) {
+            setParsedPreview(`Parsed ${entries.length} values successfully`);
+            toast.success(`✓ ${title} parsed and fields auto-filled`);
+            setLocked(false);
+          } else {
+            toast.warning(`No valid values found in file`);
+          }
+        } catch (objError) {
+          console.error('Error processing object entries:', objError);
+          toast.error('Error processing parsed data');
+        }
+      } else {
+        toast.error(`Unexpected response format: ${typeof data}`);
+      }
+    } catch (error: any) {
+      let errorMsg = 'Failed to parse file';
+      if (error?.response?.status === 404) {
+        errorMsg = 'Parse endpoint not found (404)';
+      } else if (error?.response?.status === 400) {
+        errorMsg = error.response.data?.message || 'Invalid file format (400)';
+      } else if (error?.response?.status === 500) {
+        errorMsg = 'Server error while parsing file (500)';
+      } else if (error?.message === 'Network Error') {
+        errorMsg = 'Network error - check backend connection';
+      }
+      toast.error(errorMsg);
+      console.error('Parse error:', error);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const addFile = (f: File) => {
     const fwp = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file: f };
     setUploadedFile(fwp);
+    setParsedPreview(null);
     onFileSelected?.(f);
   };
 
   const removeFile = () => {
     setUploadedFile(null);
+    setParsedPreview(null);
+    setParsedItems([]);
     onFileSelected?.(null);
   };
 
@@ -196,7 +274,7 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
             <Button type="button" size="sm" variant="outline" onClick={() => { removeFile(); fileRef.current?.click(); }} className="h-7 text-xs">
               Replace
             </Button>
-            <Button type="button" size="sm" onClick={handleProcess} disabled={processing} className="h-7 text-xs">
+            <Button type="button" size="sm" onClick={handleProcess} disabled={processing || !configType} className="h-7 text-xs">
               {processing ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Processing...</> : "Process"}
             </Button>
           </div>
@@ -216,6 +294,69 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
         )}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf" className="hidden" onChange={(e) => { if (e.target.files?.[0]) addFile(e.target.files[0]); }} />
       </div>
+
+      {/* Parse preview message */}
+      {parsedPreview && (
+        <div className="text-xs text-status-success bg-status-success/10 px-3 py-2 rounded flex items-center gap-2">
+          <CheckCircle2 className="w-3 h-3" /> {parsedPreview}
+        </div>
+      )}
+
+      {/* Parsed items table */}
+      {parsedItems.length > 0 && (() => {
+        const columns = Array.from(
+          parsedItems.reduce<Set<string>>((keys, row) => { Object.keys(row).forEach(k => keys.add(k)); return keys; }, new Set())
+        );
+        const formatHeader = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const formatCell = (value: unknown) => {
+          if (value === null || value === undefined) return '—';
+          if (typeof value === 'number') return value.toLocaleString('en-IN');
+          return String(value);
+        };
+        const getRateTypeBadge = (type: string) => {
+          const styles: Record<string, string> = {
+            FIXED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+            MRP: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+            AS_PER_SITE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+            PERCENTAGE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+            SECTION_HEADER: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+            UNKNOWN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+          };
+          return styles[type] || 'bg-muted text-muted-foreground';
+        };
+        return (
+          <div className="border rounded-md overflow-hidden">
+            <div className="max-h-[200px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/70 sticky top-0">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-8">#</th>
+                    {columns.map(col => (
+                      <th key={col} className="px-2 py-1.5 text-left font-medium text-muted-foreground">{formatHeader(col)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {parsedItems.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-muted/30">
+                      <td className="px-2 py-1 text-muted-foreground">{idx + 1}</td>
+                      {columns.map(col => (
+                        <td key={col} className="px-2 py-1">
+                          {col === 'rate_type' ? (
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getRateTypeBadge(String(row[col] ?? ''))}`}>
+                              {String(row[col] ?? '—').replace(/_/g, ' ')}
+                            </span>
+                          ) : formatCell(row[col])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Locked/unlockable fields */}
       <div className="flex items-center justify-between">
@@ -488,12 +629,12 @@ export function AddSubprojectDialog({
                       fileLabel="Upload asset cost sheet (.xlsx / .csv)"
                       sampleUrl="/samples/asset-value"
                       sampleFilename="sample_asset_value.csv"
+                      configType="asset-values"
                       onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, assetValue: f || undefined }))}
                       fields={[
                         { label: "Unit Cost (₹)", name: "assetUnitCost", value: form.watch("assetUnitCost"), onChange: (v) => form.setValue("assetUnitCost", v) },
                         { label: "Installation Cost (₹)", name: "assetInstallationCost", value: form.watch("assetInstallationCost"), onChange: (v) => form.setValue("assetInstallationCost", v) },
-                        { label: "Logistics Cost (₹)", name: "assetLogisticsCost", value: form.watch("assetLogisticsCost"), onChange: (v) => form.setValue("assetLogisticsCost", v) },
-                        { label: "Total Cost (₹)", name: "assetTotalCost", value: form.watch("assetTotalCost"), onChange: (v) => form.setValue("assetTotalCost", v) },
+                        { label: "Stabilizer Cost (₹)", name: "stabilizerCost", value: form.watch("assetLogisticsCost"), onChange: (v) => form.setValue("assetLogisticsCost", v) },
                       ]}
                     />
                   </AccordionContent>
@@ -515,6 +656,7 @@ export function AddSubprojectDialog({
                       fileLabel="Upload material cost file"
                       sampleUrl="/samples/cost-price"
                       sampleFilename="sample_cost_price.csv"
+                      configType="cost-price"
                       onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, costPrice: f || undefined }))}
                       fields={[
                         { label: "Material Cost Price (₹)", name: "extraMaterialCostPrice", value: form.watch("extraMaterialCostPrice"), onChange: (v) => form.setValue("extraMaterialCostPrice", v) },
@@ -539,6 +681,7 @@ export function AddSubprojectDialog({
                       fileLabel="Upload sell price / RC file"
                       sampleUrl="/samples/sell-price"
                       sampleFilename="sample_sell_price.csv"
+                      configType="sell-price"
                       onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, sellPrice: f || undefined }))}
                       fields={[
                         { label: "Sell Price (₹)", name: "extraMaterialSellPrice", value: form.watch("extraMaterialSellPrice"), onChange: (v) => form.setValue("extraMaterialSellPrice", v) },

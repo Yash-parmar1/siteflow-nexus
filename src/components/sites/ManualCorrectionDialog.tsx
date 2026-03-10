@@ -44,12 +44,15 @@ export default function ManualCorrectionDialog({
         .get(`/projects/${projectId}/subprojects/${subprojectId}/uploads/${sessionId}`)
         .then((res) => {
           const payload: any = res.data;
+          console.log('[ManualCorrection] Raw API payload:', JSON.stringify(payload, null, 2));
 
           // Prefer parsed failedRows if present, otherwise derive failed rows from rows (status ERROR/WARNING/SKIPPED)
           const sessionObj = payload.session || payload;
           let failedRowsSource: any[] = [];
 
           if (Array.isArray(payload.failedRows) && payload.failedRows.length > 0) {
+            console.log('[ManualCorrection] Using payload.failedRows, count:', payload.failedRows.length);
+            console.log('[ManualCorrection] First failedRow sample:', JSON.stringify(payload.failedRows[0], null, 2));
             // Ensure items have consistent shape (rowNumber, siteCode, message, isError, rowData)
             failedRowsSource = payload.failedRows.map((r: any) => ({
               rowNumber: r.rowNumber ?? r.row ?? 0,
@@ -59,16 +62,21 @@ export default function ManualCorrectionDialog({
               rowData: r.rowData ?? r.row_data ?? r.data ?? null,
             }));
           } else if (Array.isArray(payload.rows) && payload.rows.length > 0) {
-            failedRowsSource = payload.rows
-              .filter((r: any) => ["ERROR", "WARNING", "SKIPPED"].includes(r.status))
-              .map((r: any) => ({
+            const filtered = payload.rows.filter((r: any) => ["ERROR", "WARNING", "SKIPPED"].includes(r.status));
+            console.log('[ManualCorrection] Using payload.rows, total:', payload.rows.length, 'filtered:', filtered.length);
+            if (filtered.length > 0) console.log('[ManualCorrection] First filtered row sample:', JSON.stringify(filtered[0], null, 2));
+            failedRowsSource = filtered.map((r: any) => ({
                 rowNumber: r.rowNumber ?? r.row ?? 0,
                 siteCode: r.siteCode ?? r.site_code ?? (r.rowData && r.rowData.site_code) ?? null,
                 message: r.message ?? r.warningMessage ?? (Array.isArray(r.errors) && r.errors.length ? r.errors.join(', ') : (Array.isArray(r.warnings) && r.warnings.length ? r.warnings.join(', ') : '')),
                 isError: r.status === 'ERROR',
                 rowData: r.rowData ?? r.row_data ?? r.data ?? null,
               }));
+          } else {
+            console.log('[ManualCorrection] No failedRows or rows found in payload. Keys:', Object.keys(payload));
           }
+
+          console.log('[ManualCorrection] Processed failedRowsSource:', JSON.stringify(failedRowsSource, null, 2));
 
           setSession({ ...sessionObj, failedRows: failedRowsSource });
 
@@ -227,7 +235,18 @@ export default function ManualCorrectionDialog({
                 </div>
 
                 <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                  {session.failedRows?.map((row) => (
+                  {(() => {
+                    // Collect ALL unique keys across all failed rows so every row shows the full set of fields
+                    const allKeys = Array.from(
+                      (session.failedRows ?? []).reduce<Set<string>>((keys, row) => {
+                        if (row.rowData && typeof row.rowData === 'object') {
+                          Object.keys(row.rowData).forEach(k => keys.add(k));
+                        }
+                        return keys;
+                      }, new Set())
+                    );
+
+                    return session.failedRows?.map((row) => (
                     <div
                       key={row.rowNumber}
                       className="p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors space-y-3"
@@ -254,16 +273,16 @@ export default function ManualCorrectionDialog({
                         {row.message}
                       </div>
 
-                      {row.rowData && Object.keys(row.rowData).length > 0 && (
+                      {row.rowData && allKeys.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                          {Object.entries(row.rowData).map(([key, value]) => (
+                          {allKeys.map((key) => (
                             <div key={`${row.rowNumber}-${key}`} className="space-y-1.5">
                               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">
                                 {key.replace(/_/g, " ")}
                               </label>
                               <input
                                 type="text"
-                                defaultValue={String(value || "")}
+                                defaultValue={String(row.rowData?.[key] ?? editedRows[row.rowNumber]?.[key] ?? "")}
                                 className="w-full px-2.5 py-1.5 border rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                                 onChange={(e) =>
                                   handleCellChange(row.rowNumber, key, e.target.value)
@@ -274,7 +293,8 @@ export default function ManualCorrectionDialog({
                         </div>
                       )}
                     </div>
-                  ))}
+                  ));
+                  })()}
                 </div>
               </>
             )}

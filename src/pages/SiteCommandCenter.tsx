@@ -121,7 +121,7 @@ export default function SiteCommandCenter() {
   const financeData = appData?.finance
     ? {
         rentStartDate: site.configuredRent ? "Active" : "-",
-        monthlyRent: acsUnits.filter((u) => u.status === "operational").length * (site.configuredRent || 0),
+        monthlyRent: acsUnits.filter((u) => u.status === "operational" && u.isIndoor).length * (site.configuredRent || 0),
         totalRevenue: appData.finance.monthlyRevenue ?? 0,
         totalCosts: (appData.finance.totalMaintenanceCost ?? 0) + (appData.finance.totalInstallationCost ?? 0),
         netProfit: appData.finance.netProfit ?? 0,

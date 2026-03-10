@@ -28,7 +28,7 @@ interface ProjectOption {
 export function SiteList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: appData, loading } = useAppData();
+  const { data: appData, loading, error } = useAppData();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   
   // Fetch projects for filter dropdowns
@@ -158,6 +158,17 @@ export function SiteList() {
       <div className="p-6 animate-fade-in">
         <div className="flex items-center justify-center py-16">
           <div className="text-sm text-muted-foreground">Loading sites...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !appData) {
+    return (
+      <div className="p-6 animate-fade-in">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <h3 className="text-lg font-medium text-destructive mb-1">Failed to load sites</h3>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       </div>
     );

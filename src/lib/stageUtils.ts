@@ -4,15 +4,15 @@
  * Frontend displays: Started, WTS, WIP, TIS, Installed, Live.
  */
 
-export const STAGE_ORDER = ["Started", "WTS", "WIP", "TIS", "Installed", "Live"] as const;
+export const STAGE_ORDER = ["Started", "WTS", "WIP", "TIS", "Installed", "Live", "TECH_LIVE", "CASH_LIVE"] as const;
 export type DisplayStage = (typeof STAGE_ORDER)[number];
-
 const STAGE_MAP: Record<string, DisplayStage> = {
   // Direct matches (case-insensitive lookup)
   STARTED: "Started",
   PLANNING: "Started",
   SIGNED: "Started",
   NEW: "Started",
+  ACQUIRED: "Started",
 
   WTS: "WTS",
   WORK_TO_START: "WTS",
@@ -21,18 +21,19 @@ const STAGE_MAP: Record<string, DisplayStage> = {
   WORK_IN_PROGRESS: "WIP",
   IN_PROGRESS: "WIP",
 
+COMPLETED: "Installed",
+
   TIS: "TIS",
   TESTING: "TIS",
   TESTING_IN_SERVICE: "TIS",
-
-  INSTALLED: "Installed",
-  INSTALLATION: "Installed",
-  INSTALLATION_DONE: "Installed",
-  COMMISSIONED: "Installed",
+  
+  // Updated values
+  TECH_LIVE: "TECH_LIVE",
 
   LIVE: "Live",
   ACTIVE: "Live",
   FINAL: "Live",
+  CASH_LIVE: "CASH_LIVE",
 };
 
 /**
