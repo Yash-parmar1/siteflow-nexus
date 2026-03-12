@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import {
   Lock, IndianRupee, Calendar, Wrench, Upload, FileText, Image, File, X,
   Percent, Package, ShoppingCart, Tag, Pencil, Loader2, FileSpreadsheet, Download, CheckCircle2,
+  AlertTriangle, ArrowRight,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -130,7 +131,7 @@ function RequiredPdfDropzone({ label, file, onFile, onRemove }: {
 }
 
 // ── Locked Section (file-upload → auto-fill) ────────────────────
-function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, sampleFilename, onFileSelected, configType }: {
+function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, sampleFilename, onFileSelected, configType, onFileProcessed, hasError }: {
   title: string;
   icon: React.ElementType;
   fields: { label: string; name: string; value: number | undefined; onChange: (v: number) => void }[];
@@ -139,6 +140,8 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
   sampleFilename?: string;
   onFileSelected?: (file: File | null) => void;
   configType?: "sell-price" | "cost-price" | "asset-values" | "rent-schedule";
+  onFileProcessed?: (data: Record<string, unknown>[]) => void;
+  hasError?: boolean;
 }) {
   const [locked, setLocked] = useState(true);
   const [uploadedFile, setUploadedFile] = useState<FileWithPreview | null>(null);
@@ -183,6 +186,7 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
         if (data.length > 0) {
           toast.success(`✓ Parsed ${data.length} items`);
           setLocked(false);
+          onFileProcessed?.(data);
         }
       } else if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
         // For asset-values and rent-schedule (returns object with scalar values)
@@ -257,7 +261,13 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
   };
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${hasError ? 'ring-1 ring-destructive/50 rounded-lg p-2' : ''}`}>
+      {/* Error indicator */}
+      {hasError && (
+        <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded flex items-center gap-2">
+          <AlertTriangle className="w-3 h-3" /> Pricing mismatch — resolve before creating subproject
+        </div>
+      )}
       {/* File upload area */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -387,6 +397,295 @@ function LockedFieldSection({ title, icon: Icon, fields, fileLabel, sampleUrl, s
   );
 }
 
+// ── Pricing Mismatch Resolution Dialog ──────────────────────────
+interface MismatchItem {
+  item?: string;
+  normalized_name?: string;
+  basic_charges?: number;
+  charges_with_gst?: number;
+  sell_price?: number;
+  rate_type?: string;
+  cost_price?: number;
+  issue?: string;
+}
+
+function PricingMismatchDialog({ open, onOpenChange, consistencyResult, onResolved }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  consistencyResult: Record<string, unknown> | null;
+  onResolved: () => void;
+}) {
+  const costOnlyItems = (consistencyResult?.costOnlyItems as MismatchItem[]) || [];
+  const sellOnlyItems = (consistencyResult?.sellOnlyItems as MismatchItem[]) || [];
+  const pricingIssues = (consistencyResult?.pricingIssues as MismatchItem[]) || [];
+  const matchedItems = (consistencyResult?.matchedItems as MismatchItem[]) || [];
+
+  // Manual price overrides for mismatched items
+  const [manualPrices, setManualPrices] = useState<Record<string, { sellPrice: string; costPrice: string }>>({});
+
+  const updatePrice = (itemName: string, field: 'sellPrice' | 'costPrice', value: string) => {
+    setManualPrices(prev => ({
+      ...prev,
+      [itemName]: { ...prev[itemName], [field]: value },
+    }));
+  };
+
+  const allResolved = () => {
+    // All cost-only items need a sell price
+    for (const item of costOnlyItems) {
+      const key = item.normalized_name || item.item || '';
+      const entry = manualPrices[key];
+      if (!entry?.sellPrice || Number(entry.sellPrice) <= 0) return false;
+    }
+    // All sell-only items need a cost price
+    for (const item of sellOnlyItems) {
+      const key = item.normalized_name || item.item || '';
+      const entry = manualPrices[key];
+      if (!entry?.costPrice || Number(entry.costPrice) <= 0) return false;
+    }
+    // All pricing issues need sell >= cost
+    for (const item of pricingIssues) {
+      const key = item.normalized_name || item.item || '';
+      const entry = manualPrices[key];
+      if (entry?.sellPrice) {
+        const sell = Number(entry.sellPrice);
+        const cost = item.cost_price || 0;
+        if (sell < cost) return false;
+      } else {
+        return false; // Needs override
+      }
+    }
+    return true;
+  };
+
+  const formatItemName = (name: string) =>
+    name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  const hasMismatches = costOnlyItems.length > 0 || sellOnlyItems.length > 0 || pricingIssues.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-5 h-5" />
+            Pricing Mismatch Detected
+          </DialogTitle>
+          <DialogDescription>
+            The cost price and sell price files have mismatched items. Configure prices below to resolve.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto px-6 space-y-4 pb-4">
+          {/* Summary */}
+          <div className="flex gap-3 text-xs">
+            <div className="flex-1 bg-muted/50 rounded px-3 py-2 text-center">
+              <div className="font-semibold text-lg">{matchedItems.length}</div>
+              <div className="text-muted-foreground">Matched</div>
+            </div>
+            <div className="flex-1 bg-amber-50 dark:bg-amber-900/20 rounded px-3 py-2 text-center">
+              <div className="font-semibold text-lg text-amber-700">{costOnlyItems.length}</div>
+              <div className="text-amber-600 dark:text-amber-400">Cost Only</div>
+            </div>
+            <div className="flex-1 bg-blue-50 dark:bg-blue-900/20 rounded px-3 py-2 text-center">
+              <div className="font-semibold text-lg text-blue-700">{sellOnlyItems.length}</div>
+              <div className="text-blue-600 dark:text-blue-400">Sell Only</div>
+            </div>
+            <div className="flex-1 bg-destructive/10 rounded px-3 py-2 text-center">
+              <div className="font-semibold text-lg text-destructive">{pricingIssues.length}</div>
+              <div className="text-destructive">Issues</div>
+            </div>
+          </div>
+
+          {/* Cost-only items (need sell price) */}
+          {costOnlyItems.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Items in Cost Price Only — Enter Sell Price
+              </h4>
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/70">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-medium">Item</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Cost (₹)</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Sell Price (₹) *</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {costOnlyItems.map((item, i) => {
+                      const key = item.normalized_name || item.item || `cost-${i}`;
+                      const costVal = item.basic_charges ?? item.charges_with_gst ?? 0;
+                      return (
+                        <tr key={key} className="hover:bg-muted/30">
+                          <td className="px-3 py-2 font-medium">{formatItemName(item.item || key)}</td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">
+                            {typeof costVal === 'number' ? costVal.toLocaleString('en-IN') : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              placeholder="Enter sell price"
+                              className="h-7 w-28 text-xs ml-auto"
+                              min={costVal || 0}
+                              value={manualPrices[key]?.sellPrice ?? ''}
+                              onChange={(e) => updatePrice(key, 'sellPrice', e.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sell-only items (need cost price) */}
+          {sellOnlyItems.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                Items in Sell Price Only — Enter Cost Price
+              </h4>
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/70">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-medium">Item</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Sell (₹)</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Cost Price (₹) *</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {sellOnlyItems.map((item, i) => {
+                      const key = item.normalized_name || item.item || `sell-${i}`;
+                      const sellVal = item.sell_price ?? 0;
+                      return (
+                        <tr key={key} className="hover:bg-muted/30">
+                          <td className="px-3 py-2 font-medium">{formatItemName(item.item || key)}</td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">
+                            {typeof sellVal === 'number' ? sellVal.toLocaleString('en-IN') : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              placeholder="Enter cost price"
+                              className="h-7 w-28 text-xs ml-auto"
+                              value={manualPrices[key]?.costPrice ?? ''}
+                              onChange={(e) => updatePrice(key, 'costPrice', e.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pricing issues (sell < cost) */}
+          {pricingIssues.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Sell Price Below Cost — Fix Required
+              </h4>
+              <div className="border border-destructive/30 rounded-md overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-destructive/5">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-medium">Item</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Cost (₹)</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Current Sell (₹)</th>
+                      <th className="px-3 py-1.5 text-right font-medium">New Sell (₹) *</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pricingIssues.map((item, i) => {
+                      const key = item.normalized_name || item.item || `issue-${i}`;
+                      const costVal = item.cost_price ?? 0;
+                      const currentSell = item.sell_price ?? 0;
+                      return (
+                        <tr key={key} className="hover:bg-muted/30">
+                          <td className="px-3 py-2 font-medium">{formatItemName(item.item || key)}</td>
+                          <td className="px-3 py-2 text-right">{typeof costVal === 'number' ? costVal.toLocaleString('en-IN') : '—'}</td>
+                          <td className="px-3 py-2 text-right text-destructive">{typeof currentSell === 'number' ? currentSell.toLocaleString('en-IN') : '—'}</td>
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              placeholder={`Min ₹${costVal}`}
+                              className="h-7 w-28 text-xs ml-auto"
+                              min={costVal}
+                              value={manualPrices[key]?.sellPrice ?? ''}
+                              onChange={(e) => updatePrice(key, 'sellPrice', e.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Matched items summary */}
+          {matchedItems.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Matched Items ({matchedItems.length})
+              </h4>
+              <div className="border rounded-md overflow-hidden">
+                <div className="max-h-[150px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/70 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-1.5 text-left font-medium">Item</th>
+                        <th className="px-3 py-1.5 text-right font-medium">Cost (₹)</th>
+                        <th className="px-3 py-1.5 text-right font-medium">Sell (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {matchedItems.map((item, i) => (
+                        <tr key={i} className="hover:bg-muted/30">
+                          <td className="px-3 py-1.5">{formatItemName(item.item || '')}</td>
+                          <td className="px-3 py-1.5 text-right text-muted-foreground">
+                            {typeof item.cost_price === 'number' ? item.cost_price.toLocaleString('en-IN') : '—'}
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            {typeof item.sell_price === 'number' ? item.sell_price.toLocaleString('en-IN') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="px-6 py-4 border-t border-border bg-card shrink-0">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={hasMismatches && !allResolved()}
+            onClick={onResolved}
+          >
+            {hasMismatches ? (allResolved() ? 'Save & Continue' : 'Fill all prices to continue') : 'Continue'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MAIN DIALOG
 // ═══════════════════════════════════════════════════════════════
@@ -411,6 +710,17 @@ export function AddSubprojectDialog({
   const [attachments, setAttachments] = useState<FileWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pricing consistency state
+  const [costPriceProcessed, setCostPriceProcessed] = useState(false);
+  const [sellPriceProcessed, setSellPriceProcessed] = useState(false);
+  const [consistencyResult, setConsistencyResult] = useState<Record<string, unknown> | null>(null);
+  const [showMismatchDialog, setShowMismatchDialog] = useState(false);
+  const [pricingConsistent, setPricingConsistent] = useState<boolean | null>(null); // null = not checked
+  const [showUploadPrompt, setShowUploadPrompt] = useState<'cost' | 'sell' | null>(null);
+  const [checkingConsistency, setCheckingConsistency] = useState(false);
+  const sellFileRef = useRef<HTMLInputElement>(null);
+  const costFileRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<SubprojectFormData>({
     resolver: zodResolver(subprojectSchema),
@@ -456,6 +766,59 @@ export function AddSubprojectDialog({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, file: f,
   });
 
+  // Run consistency check when both files are processed
+  const runConsistencyCheck = useCallback(async (costFile?: File, sellFile?: File) => {
+    const cf = costFile || configFiles.costPrice;
+    const sf = sellFile || configFiles.sellPrice;
+    if (!cf || !sf) return;
+
+    setCheckingConsistency(true);
+    try {
+      const fd = new FormData();
+      fd.append('costFile', cf);
+      fd.append('sellFile', sf);
+      const res = await api.post('/config/preview/material-consistency', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setConsistencyResult(res.data);
+      if (res.data.consistent) {
+        setPricingConsistent(true);
+        setShowUploadPrompt(null);
+        toast.success('Cost and sell prices are consistent');
+      } else {
+        setPricingConsistent(false);
+        setShowMismatchDialog(true);
+      }
+    } catch {
+      toast.error('Failed to check pricing consistency');
+    } finally {
+      setCheckingConsistency(false);
+    }
+  }, [configFiles.costPrice, configFiles.sellPrice]);
+
+  // Called when cost price file is successfully processed
+  const handleCostPriceProcessed = useCallback(() => {
+    setCostPriceProcessed(true);
+    if (!sellPriceProcessed) {
+      setShowUploadPrompt('sell');
+    } else {
+      runConsistencyCheck();
+    }
+  }, [sellPriceProcessed, runConsistencyCheck]);
+
+  // Called when sell price file is successfully processed
+  const handleSellPriceProcessed = useCallback(() => {
+    setSellPriceProcessed(true);
+    if (!costPriceProcessed) {
+      setShowUploadPrompt('cost');
+    } else {
+      runConsistencyCheck();
+    }
+  }, [costPriceProcessed, runConsistencyCheck]);
+
+  // Can only submit if pricing hasn't been attempted or is consistent
+  const pricingBlocked = pricingConsistent === false;
+
   const handleSubmit = async (data: SubprojectFormData) => {
     setIsSubmitting(true);
     try {
@@ -463,6 +826,11 @@ export function AddSubprojectDialog({
       toast.success("Subproject created with locked configuration");
       form.reset();
       setConfigFiles({});
+      setCostPriceProcessed(false);
+      setSellPriceProcessed(false);
+      setConsistencyResult(null);
+      setPricingConsistent(null);
+      setShowUploadPrompt(null);
       onOpenChange(false);
     } catch {
       toast.error("Failed to create subproject");
@@ -472,8 +840,8 @@ export function AddSubprojectDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+    <>
+    <Dialog open={open} onOpenChange={onOpenChange}>      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />
@@ -641,12 +1009,12 @@ export function AddSubprojectDialog({
                 </AccordionItem>
 
                 {/* 4. Extra Material Cost Price (Locked) */}
-                <AccordionItem value="extra-material-cost" className={`rounded-lg border px-4 transition-colors ${getSectionStyle("extra-material-cost")}`}>
+                <AccordionItem value="extra-material-cost" className={`rounded-lg border px-4 transition-colors ${getSectionStyle("extra-material-cost")} ${pricingConsistent === false ? 'border-destructive/60' : ''}`}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <ShoppingCart className="w-4 h-4 text-primary" />
                       Extra Material Cost Price
-                      <Lock className="w-3 h-3 text-muted-foreground" />
+                      {pricingConsistent === false ? <AlertTriangle className="w-3 h-3 text-destructive" /> : <Lock className="w-3 h-3 text-muted-foreground" />}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
@@ -657,7 +1025,9 @@ export function AddSubprojectDialog({
                       sampleUrl="/samples/cost-price"
                       sampleFilename="sample_cost_price.csv"
                       configType="cost-price"
+                      hasError={pricingConsistent === false}
                       onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, costPrice: f || undefined }))}
+                      onFileProcessed={() => handleCostPriceProcessed()}
                       fields={[
                         { label: "Material Cost Price (₹)", name: "extraMaterialCostPrice", value: form.watch("extraMaterialCostPrice"), onChange: (v) => form.setValue("extraMaterialCostPrice", v) },
                       ]}
@@ -666,12 +1036,12 @@ export function AddSubprojectDialog({
                 </AccordionItem>
 
                 {/* 5. Extra Material Sell Price / RC (Locked) */}
-                <AccordionItem value="extra-material-sell" className={`rounded-lg border px-4 transition-colors ${getSectionStyle("extra-material-sell")}`}>
+                <AccordionItem value="extra-material-sell" className={`rounded-lg border px-4 transition-colors ${getSectionStyle("extra-material-sell")} ${pricingConsistent === false ? 'border-destructive/60' : ''}`}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Tag className="w-4 h-4 text-primary" />
                       Extra Material Sell Price / RC
-                      <Lock className="w-3 h-3 text-muted-foreground" />
+                      {pricingConsistent === false ? <AlertTriangle className="w-3 h-3 text-destructive" /> : <Lock className="w-3 h-3 text-muted-foreground" />}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
@@ -682,7 +1052,9 @@ export function AddSubprojectDialog({
                       sampleUrl="/samples/sell-price"
                       sampleFilename="sample_sell_price.csv"
                       configType="sell-price"
+                      hasError={pricingConsistent === false}
                       onFileSelected={(f) => setConfigFiles(prev => ({ ...prev, sellPrice: f || undefined }))}
+                      onFileProcessed={() => handleSellPriceProcessed()}
                       fields={[
                         { label: "Sell Price (₹)", name: "extraMaterialSellPrice", value: form.watch("extraMaterialSellPrice"), onChange: (v) => form.setValue("extraMaterialSellPrice", v) },
                         { label: "RC Amount (₹)", name: "extraMaterialRC", value: form.watch("extraMaterialRC"), onChange: (v) => form.setValue("extraMaterialRC", v) },
@@ -691,6 +1063,63 @@ export function AddSubprojectDialog({
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
+
+              {/* ── Upload Prompt Banner ── */}
+              {showUploadPrompt && (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="flex-1 text-xs text-amber-800 dark:text-amber-300">
+                    {showUploadPrompt === 'sell'
+                      ? 'Cost price uploaded — please also upload the sell price file to validate pricing consistency.'
+                      : 'Sell price uploaded — please also upload the cost price file to validate pricing consistency.'}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs shrink-0 border-amber-400 text-amber-700 hover:bg-amber-100"
+                    onClick={() => {
+                      setShowUploadPrompt(null);
+                      setOpenAccordions(prev => [...prev, showUploadPrompt === 'sell' ? 'extra-material-sell' : 'extra-material-cost']);
+                    }}
+                  >
+                    Upload {showUploadPrompt === 'sell' ? 'Sell Price' : 'Cost Price'} <ArrowRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
+              )}
+
+              {/* ── Consistency Check Loading ── */}
+              {checkingConsistency && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Checking pricing consistency...
+                </div>
+              )}
+
+              {/* ── Pricing Consistent Badge ── */}
+              {pricingConsistent === true && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3 h-3" /> Cost and sell prices are consistent
+                </div>
+              )}
+
+              {/* ── Pricing Inconsistent Warning ── */}
+              {pricingConsistent === false && !showMismatchDialog && (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-destructive/50 bg-destructive/5">
+                  <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                  <div className="flex-1 text-xs text-destructive">
+                    Pricing mismatch detected. Resolve mismatches before creating subproject.
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs shrink-0 border-destructive/50 text-destructive hover:bg-destructive/10"
+                    onClick={() => setShowMismatchDialog(true)}
+                  >
+                    Resolve
+                  </Button>
+                </div>
+              )}
 
               {/* ── Required PDF Dropzones ── */}
               <div className="space-y-3">
@@ -736,13 +1165,33 @@ export function AddSubprojectDialog({
             {/* ── Sticky Footer ── */}
             <DialogFooter className="px-6 py-4 border-t border-border bg-card shrink-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create & Lock Configuration"}
+              <Button type="submit" disabled={isSubmitting || pricingBlocked}>
+                {isSubmitting ? "Creating..." : pricingBlocked ? "Resolve Pricing Mismatches" : "Create & Lock Configuration"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* ── Pricing Mismatch Resolution Dialog ── */}
+    <PricingMismatchDialog
+      open={showMismatchDialog}
+      onOpenChange={(open) => {
+        setShowMismatchDialog(open);
+        if (!open && pricingConsistent !== true) {
+          // User dismissed without resolving — keep blocked
+          setPricingConsistent(false);
+        }
+      }}
+      consistencyResult={consistencyResult}
+      onResolved={() => {
+        setPricingConsistent(true);
+        setShowMismatchDialog(false);
+        setShowUploadPrompt(null);
+        toast.success('Pricing mismatches resolved');
+      }}
+    />
+    </>
   );
 }

@@ -17,7 +17,7 @@ import { toast } from "sonner";
 /*  Category / config definitions                                      */
 /* ------------------------------------------------------------------ */
 
-type Category = "sites" | "assets" | "installations" | "extra-materials" | "config";
+type Category = "sites" | "assets" | "installations" | "extra-materials" | "invoices-per-site" | "final-invoice" | "config";
 type ConfigSub = "sell-price" | "cost-price" | "asset-values" | "rent-schedule";
 
 interface CategoryMeta {
@@ -51,6 +51,18 @@ const CATEGORIES: Record<Category, CategoryMeta> = {
     description: "Import extra material usage per site (copper, bracket, etc.).",
     sampleEndpoint: "/samples/extra-materials",
     sampleFilename: "sample_extra_materials.csv",
+  },
+  "invoices-per-site": {
+    label: "Invoices Per Site",
+    description: "Import installation invoices per site — invoice ref, amount, GST, payment status.",
+    sampleEndpoint: "/samples/invoices-per-site",
+    sampleFilename: "sample_invoices_per_site.csv",
+  },
+  "final-invoice": {
+    label: "Final Invoice",
+    description: "Import final consolidated invoice with extra material charges billed to the client per site.",
+    sampleEndpoint: "/samples/final-invoice",
+    sampleFilename: "sample_final_invoice.csv",
   },
   config: {
     label: "Config Files",
@@ -139,6 +151,14 @@ export default function AddFilesDialog({
         case "extra-materials":
           fd.append("subprojectId", subprojectId);
           endpoint = `/finance/extra-materials/upload`;
+          break;
+        case "invoices-per-site":
+          fd.append("subprojectId", subprojectId);
+          endpoint = `/finance/invoices-per-site/upload`;
+          break;
+        case "final-invoice":
+          fd.append("subprojectId", subprojectId);
+          endpoint = `/finance/final-invoice/upload`;
           break;
         case "config":
           endpoint = `/subproject/${subprojectId}/config/${configSub}`;

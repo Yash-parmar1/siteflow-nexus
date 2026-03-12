@@ -53,15 +53,15 @@ export function SiteList() {
     if (!appData?.sites) return [];
     return appData.sites.map(s => {
       const stage = normalizeStage(s.currentStage);
-      const planned = s.acsPlanned ?? s.plannedAcsCount ?? 0;
+      const plannedActual = s.acsPlanned ?? s.plannedAcsCount ?? 0;
       const installed = s.acsInstalled ?? 0;
       return {
         id: String(s.id),
         name: s.name || "Unnamed Site",
         location: s.location || s.addressJson || "",
         stage,
-        progress: computeProgress(s.progress ?? 0, stage, planned, installed),
-        acsPlanned: planned,
+        progress: computeProgress(s.progress ?? 0, stage, plannedActual, installed),
+        acsPlanned: plannedActual * 2, // Multiply by 2 for display
         acsInstalled: installed,
         hasDelay: s.hasDelay ?? false,
         rentStartDate: undefined as string | undefined,

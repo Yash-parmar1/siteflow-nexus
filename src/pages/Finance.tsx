@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { CreateInvoiceDialog } from "@/components/forms/CreateInvoiceDialog";
 import FinancialImportDialog from "@/components/finance/FinancialImportDialog";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import {
   Search, Download, Plus, Upload, TrendingUp, ArrowUpRight, ArrowDownRight, CheckCircle2,
   Clock, Wallet, IndianRupee, AlertTriangle, FileText, ExternalLink, Filter,
+  ChevronDown, ChevronRight, Package, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppData, type FinancialTransaction } from "@/context/AppDataContext";
@@ -195,9 +196,101 @@ export default function Finance() {
     );
   }, [siteSearch, siteFinancials]);
 
-  // ── No materials data from backend yet - show empty ───────────
+  // ── Materials cost data ────────────────────────────────────────
   const filteredMaterials: any[] = [];
   const materialTotals: Record<string, number> = {};
+
+  // Materials summary state
+  interface MaterialItem {
+    material: string;
+    totalQty: number;
+    totalCost: number;
+    totalSell: number;
+    unitPrice: number;
+    sellPrice: number;
+    usageCount: number;
+  }
+  interface SiteDetail {
+    siteId: number;
+    siteCode: string;
+    totalCost: number;
+    totalSell: number;
+    margin: number;
+  }
+  interface SubprojectMaterialSummary {
+    subprojectId: number;
+    subprojectName: string;
+    projectName: string | null;
+    totalSitesWithMaterials: number;
+    grandTotalCost: number;
+    grandTotalSell: number;
+    grandMargin: number;
+    materials: MaterialItem[];
+    siteDetails: SiteDetail[];
+  }
+  const [materialsSummary, setMaterialsSummary] = useState<SubprojectMaterialSummary[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [expandedSubprojects, setExpandedSubprojects] = useState<Set<number>>(new Set());
+
+  const fetchMaterialsSummary = useCallback(async () => {
+    setMaterialsLoading(true);
+    try {
+      const res = await fetch("/api/finance/materials-summary");
+      if (res.ok) {
+        const data = await res.json();
+        setMaterialsSummary(data);
+      }
+    } catch { /* ignore */ } finally { setMaterialsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchMaterialsSummary(); }, [fetchMaterialsSummary]);
+
+  const toggleSubproject = (id: number) => {
+    setExpandedSubprojects(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const downloadMaterialsSummary = () => {
+    if (!materialsSummary.length) return;
+    const rows: Record<string, unknown>[] = [];
+    for (const sp of materialsSummary) {
+      for (const mat of sp.materials) {
+        rows.push({
+          "Subproject": sp.subprojectName,
+          "Project": sp.projectName ?? "",
+          "Material": mat.material.replace(/_/g, " "),
+          "Sites Used": mat.usageCount,
+          "Total Qty": Math.round(mat.totalQty),
+          "Unit Cost (₹)": mat.unitPrice,
+          "Unit Sell (₹)": mat.sellPrice || "",
+          "Total Cost (₹)": mat.totalCost,
+          "Total Sell (₹)": mat.totalSell || "",
+          "Margin (₹)": mat.totalSell > 0 ? mat.totalSell - mat.totalCost : "",
+        });
+      }
+      rows.push({
+        "Subproject": sp.subprojectName,
+        "Project": sp.projectName ?? "",
+        "Material": "── TOTAL ──",
+        "Sites Used": sp.totalSitesWithMaterials,
+        "Total Qty": "",
+        "Unit Cost (₹)": "",
+        "Unit Sell (₹)": "",
+        "Total Cost (₹)": sp.grandTotalCost,
+        "Total Sell (₹)": sp.grandTotalSell || "",
+        "Margin (₹)": sp.grandTotalSell > 0 ? sp.grandMargin : "",
+      });
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = Object.keys(rows[0] || {}).map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Materials Summary");
+    XLSX.writeFile(wb, `Materials_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    sonnerToast.success("Materials summary exported");
+  };
 
   const handleExport = () => {
     const txns = appData?.financialTransactions ?? [];
@@ -506,15 +599,162 @@ export default function Finance() {
 
         {/* ═══════════════ TAB 5: MATERIALS COST ═══════════════ */}
         <TabsContent value="materials" className="space-y-4">
-          <Card className="border-border/60">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">Materials Cost Tracking</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-md">
-                Materials cost data will appear here once material usage is tracked per site through installations and maintenance.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Subproject-wise extra material usage — cost price vs sell price charged to client</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={downloadMaterialsSummary} disabled={materialsLoading || !materialsSummary.length}>
+                <Download className="w-4 h-4 mr-1" />
+                Download Summary
+              </Button>
+              <Button variant="outline" size="sm" onClick={fetchMaterialsSummary} disabled={materialsLoading}>
+                {materialsLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <ArrowUpRight className="w-4 h-4 mr-1" />}
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {materialsLoading ? (
+            <Card className="border-border/60">
+              <CardContent className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ) : materialsSummary.length === 0 ? (
+            <Card className="border-border/60">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <Package className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No Materials Data</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  Upload extra material per site data for subprojects to see cost and sell price breakdowns here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Grand totals across all subprojects */}
+              {materialsSummary.length > 1 && (() => {
+                const allCost = materialsSummary.reduce((s, sp) => s + sp.grandTotalCost, 0);
+                const allSell = materialsSummary.reduce((s, sp) => s + sp.grandTotalSell, 0);
+                const allMargin = allSell - allCost;
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <KpiCard icon={Package} iconColor="text-primary" label="Total Cost (All)" value={formatCurrency(allCost)} />
+                    <KpiCard icon={IndianRupee} iconColor="text-[hsl(var(--status-success))]" label="Total Sell (All)" value={formatCurrency(allSell)} />
+                    <KpiCard icon={TrendingUp} iconColor={allMargin >= 0 ? "text-[hsl(var(--status-success))]" : "text-[hsl(var(--status-error))]"} label="Margin (All)" value={formatCurrency(allMargin)} valueColor={allMargin >= 0 ? "text-[hsl(var(--status-success))]" : "text-[hsl(var(--status-error))]"} />
+                    <KpiCard icon={FileText} iconColor="text-muted-foreground" label="Subprojects" value={String(materialsSummary.length)} />
+                  </div>
+                );
+              })()}
+
+              {/* Per-subproject cards */}
+              <div className="space-y-4">
+                {materialsSummary.map(sp => {
+                  const expanded = expandedSubprojects.has(sp.subprojectId);
+                  return (
+                    <Card key={sp.subprojectId} className="border-border/60">
+                      <CardHeader
+                        className="cursor-pointer hover:bg-muted/30 transition-colors pb-3"
+                        onClick={() => toggleSubproject(sp.subprojectId)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {expanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+                            <div>
+                              <CardTitle className="text-base">{sp.subprojectName}</CardTitle>
+                              {sp.projectName && <p className="text-xs text-muted-foreground mt-0.5">{sp.projectName}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="text-right">
+                              <span className="text-muted-foreground">Cost: </span>
+                              <span className="font-semibold">{formatCurrency(sp.grandTotalCost)}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-muted-foreground">Sell: </span>
+                              <span className="font-semibold text-[hsl(var(--status-success))]">{formatCurrency(sp.grandTotalSell)}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-muted-foreground">Margin: </span>
+                              <span className={`font-semibold ${sp.grandMargin >= 0 ? "text-[hsl(var(--status-success))]" : "text-[hsl(var(--status-error))]"}`}>
+                                {formatCurrency(sp.grandMargin)}
+                              </span>
+                            </div>
+                            <Badge variant="outline">{sp.totalSitesWithMaterials} sites</Badge>
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      {expanded && (
+                        <CardContent className="pt-0">
+                          {/* Column explanations */}
+                          <div className="text-xs text-muted-foreground bg-muted/30 rounded-md p-2.5 mb-3 space-y-0.5">
+                            <p><span className="font-medium text-foreground">Sites Used</span> — number of installation sites where this material was consumed</p>
+                            <p><span className="font-medium text-foreground">Total Qty</span> — total quantity across all sites (meters for pipes/wires, units for items)</p>
+                            <p><span className="font-medium text-foreground">Unit Cost / Sell</span> — per-unit price we pay (cost) vs charge client (sell)</p>
+                            <p><span className="font-medium text-foreground">Margin</span> — profit = Total Sell − Total Cost</p>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent border-border">
+                                <TableHead>Material</TableHead>
+                                <TableHead className="text-right">Sites Used</TableHead>
+                                <TableHead className="text-right">Total Qty</TableHead>
+                                <TableHead className="text-right">Unit Cost</TableHead>
+                                <TableHead className="text-right">Unit Sell</TableHead>
+                                <TableHead className="text-right">Total Cost</TableHead>
+                                <TableHead className="text-right">Total Sell</TableHead>
+                                <TableHead className="text-right">Margin</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {sp.materials.map((mat) => {
+                                const margin = mat.totalSell - mat.totalCost;
+                                return (
+                                  <TableRow key={mat.material} className="hover:bg-muted/50 border-border/50">
+                                    <TableCell className="font-medium capitalize">{mat.material.replace(/_/g, " ")}</TableCell>
+                                    <TableCell className="text-right">{mat.usageCount}</TableCell>
+                                    <TableCell className="text-right">{Math.round(mat.totalQty)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(mat.unitPrice)}</TableCell>
+                                    <TableCell className="text-right">
+                                      {mat.sellPrice > 0 ? formatCurrency(mat.sellPrice) : <span className="text-muted-foreground">—</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right">{formatCurrency(mat.totalCost)}</TableCell>
+                                    <TableCell className="text-right text-[hsl(var(--status-success))]">
+                                      {mat.totalSell > 0 ? formatCurrency(mat.totalSell) : <span className="text-muted-foreground">—</span>}
+                                    </TableCell>
+                                    <TableCell className={`text-right font-medium ${margin >= 0 ? "text-[hsl(var(--status-success))]" : "text-[hsl(var(--status-error))]"}`}>
+                                      {mat.totalSell > 0 ? formatCurrency(margin) : <span className="text-muted-foreground">—</span>}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              {/* Totals row */}
+                              <TableRow className="bg-muted/30 font-semibold border-t-2">
+                                <TableCell>Total</TableCell>
+                                <TableCell className="text-right">{sp.totalSitesWithMaterials}</TableCell>
+                                <TableCell className="text-right">{Math.round(sp.materials.reduce((s, m) => s + Number(m.totalQty), 0))}</TableCell>
+                                <TableCell />
+                                <TableCell />
+                                <TableCell className="text-right">{formatCurrency(sp.grandTotalCost)}</TableCell>
+                                <TableCell className="text-right text-[hsl(var(--status-success))]">
+                                  {sp.grandTotalSell > 0 ? formatCurrency(sp.grandTotalSell) : "—"}
+                                </TableCell>
+                                <TableCell className={`text-right ${sp.grandMargin >= 0 ? "text-[hsl(var(--status-success))]" : "text-[hsl(var(--status-error))]"}`}>
+                                  {sp.grandTotalSell > 0 ? formatCurrency(sp.grandMargin) : "—"}
+                                </TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* ═══════════════ TAB 6: GST REPORT ═══════════════ */}

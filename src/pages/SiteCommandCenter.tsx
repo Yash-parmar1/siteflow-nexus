@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SiteHeader } from "@/components/sites/SiteHeader";
 import { SiteTimeline } from "@/components/sites/SiteTimeline";
@@ -7,11 +7,12 @@ import { InstallationTracking } from "@/components/sites/InstallationTracking";
 import { MaintenanceTickets } from "@/components/sites/MaintenanceTickets";
 import { FinanceSnapshot } from "@/components/sites/FinanceSnapshot";
 import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
-import { Info, Zap } from "lucide-react";
+import { Info, Zap, Package } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 import { normalizeStage, computeProgress, STAGE_ORDER, stageIndex } from "@/lib/stageUtils";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import api from "@/lib/api";
 
 export default function SiteCommandCenter() {
   const { siteId } = useParams();
@@ -19,6 +20,15 @@ export default function SiteCommandCenter() {
   const navigate = useNavigate();
   const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
   const [evidenceData, setEvidenceData] = useState<{ photos: any[]; documents: any[]; title: string }>({ photos: [], documents: [], title: "" });
+  const [extraMaterials, setExtraMaterials] = useState<any>(null);
+
+  // Fetch per-site extra materials
+  useEffect(() => {
+    if (!siteId) return;
+    api.get(`/finance/sites/${siteId}/extra-materials`)
+      .then(res => setExtraMaterials(res.data))
+      .catch(() => {});
+  }, [siteId]);
 
   // Build live site data from appData
   const liveSite = appData?.sites?.find((s) => String(s.id) === siteId);
@@ -280,6 +290,83 @@ export default function SiteCommandCenter() {
 
             {/* Finance Snapshot */}
             <FinanceSnapshot data={financeData} />
+
+            {/* Extra Materials Used */}
+            {extraMaterials && extraMaterials.entries?.length > 0 && (
+              <div className="bg-card/80 backdrop-blur-sm rounded-xl border border-border p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-500/10 rounded-lg">
+                    <Package className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Extra Materials</h2>
+                    <p className="text-sm text-muted-foreground">Materials used at this site beyond standard installation</p>
+                  </div>
+                </div>
+
+                {/* Summary cards */}
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs">Total Cost</p>
+                    <p className="font-semibold text-foreground">₹{Number(extraMaterials.totalExtraMaterialsCost ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs">Total Sell</p>
+                    <p className="font-semibold text-foreground">₹{Number(extraMaterials.totalExtraMaterialsSell ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs">Margin</p>
+                    <p className="font-semibold text-foreground">₹{(Number(extraMaterials.totalExtraMaterialsSell ?? 0) - Number(extraMaterials.totalExtraMaterialsCost ?? 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                  </div>
+                </div>
+
+                {/* Materials table */}
+                {extraMaterials.entries.map((entry: any, idx: number) => (
+                  <div key={idx} className="space-y-2">
+                    {entry.booking_address && (
+                      <p className="text-xs text-muted-foreground font-medium">{entry.booking_address}</p>
+                    )}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border text-muted-foreground">
+                            <th className="text-left py-1.5 font-medium">Material</th>
+                            <th className="text-right py-1.5 font-medium">Qty</th>
+                            <th className="text-right py-1.5 font-medium">Unit</th>
+                            <th className="text-right py-1.5 font-medium">Cost/Unit</th>
+                            <th className="text-right py-1.5 font-medium">Sell/Unit</th>
+                            <th className="text-right py-1.5 font-medium">Cost Total</th>
+                            <th className="text-right py-1.5 font-medium">Sell Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(entry.materials || []).map((m: any, mi: number) => (
+                            <tr key={mi} className="border-b border-border/50">
+                              <td className="py-1.5 text-foreground">{m.material_name}</td>
+                              <td className="text-right py-1.5">{m.quantity}</td>
+                              <td className="text-right py-1.5">{m.unit}</td>
+                              <td className="text-right py-1.5">₹{Number(m.unit_price ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="text-right py-1.5">₹{Number(m.sell_price ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="text-right py-1.5 font-medium">₹{Number(m.line_total ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="text-right py-1.5 font-medium">₹{Number(m.sell_total ?? 0).toLocaleString('en-IN')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        {entry.total_cost != null && (
+                          <tfoot>
+                            <tr className="border-t border-border font-semibold text-foreground">
+                              <td colSpan={5} className="py-1.5">Entry Total</td>
+                              <td className="text-right py-1.5">₹{Number(entry.total_cost ?? 0).toLocaleString('en-IN')}</td>
+                              <td className="text-right py-1.5">₹{Number(entry.total_sell ?? 0).toLocaleString('en-IN')}</td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

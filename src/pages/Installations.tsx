@@ -5,35 +5,18 @@ import { ImportInstallationsDialog } from "@/components/forms/ImportInstallation
 import { EditInstallationDialog } from "@/components/forms/EditInstallationDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
-  Search, Plus, Filter, Truck, Package, MapPin, Calendar, MoreHorizontal,
-  Download, CheckCircle2, Clock, AlertCircle, ArrowRight, FileText, Camera, Upload, Pencil, Eye, X,
+  Search, Plus, Filter, Truck, Package,
+  Download, CheckCircle2, AlertCircle, Upload,
 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAppData, type InstallationData } from "@/context/AppDataContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceGallery } from "@/components/assets/EvidenceGallery";
+import { InstallationCard } from "@/components/installations/InstallationCard";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-
-const statusConfig: Record<string, { color: string; bgColor: string }> = {
-  "Pending Dispatch": { color: "text-muted-foreground", bgColor: "bg-muted" },
-  "In Transit": { color: "text-[hsl(var(--status-info))]", bgColor: "bg-[hsl(var(--status-info)/0.15)]" },
-  Scheduled: { color: "text-[hsl(var(--status-info))]", bgColor: "bg-[hsl(var(--status-info)/0.15)]" },
-  Installing: { color: "text-[hsl(var(--status-warning))]", bgColor: "bg-[hsl(var(--status-warning)/0.15)]" },
-  Completed: { color: "text-[hsl(var(--status-success))]", bgColor: "bg-[hsl(var(--status-success)/0.15)]" },
-  Delayed: { color: "text-[hsl(var(--status-error))]", bgColor: "bg-[hsl(var(--status-error)/0.15)]" },
-};
-
-const priorityConfig: Record<string, string> = {
-  High: "text-[hsl(var(--status-error))]",
-  Medium: "text-[hsl(var(--status-warning))]",
-  Low: "text-muted-foreground",
-};
 
 export default function Installations() {
   const navigate = useNavigate();
@@ -88,63 +71,65 @@ export default function Installations() {
   };
 
   // Map live installation data from backend
-  const installations = (appData?.installations || []).map((inst: InstallationData) => ({
-    id: String(inst.id),
-    docketId: inst.bookingId ?? `DOC-${inst.id}`,
-    site: inst.siteName ?? "Unknown",
-    siteId: String(inst.siteId),
-    units: 1,
-    status: inst.shipmentStatus === "PENDING" ? "Pending Dispatch"
-      : inst.shipmentStatus === "IN_TRANSIT" ? "In Transit"
-      : inst.shipmentStatus === "DELIVERED" ? "Scheduled"
-      : inst.shipmentStatus === "INSTALLED" ? "Completed"
-      : inst.shipmentStatus ?? "Pending Dispatch",
-    progress: inst.shipmentStatus === "INSTALLED" ? 100
-      : inst.shipmentStatus === "DELIVERED" ? 75
-      : inst.shipmentStatus === "IN_TRANSIT" ? 40
-      : 5,
-    shipmentDate: inst.createdAt ? new Date(inst.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
-    eta: inst.eta ?? "-",
-    installer: "-",
-    installerContact: "-",
-    priority: "Medium",
-    notes: inst.remarks ?? "",
-    acAssetSerial: inst.acAssetSerial ?? "",
-    hasEvidence: !!(inst.serialNumberImageUrl || inst.evidenceImagesJson),
-    // Parse remarks: if it looks like JSON materials data, extract it; otherwise treat as plain text
-    materials: (() => {
-      const raw = inst.remarks ?? "";
-      // Try to detect JSON material data patterns
-      const jsonMatch = raw.match(/\{[^{}]*(?:"copper_pipe|"odu_stand|"four_core|"three_core|"drain_pipe|"ladder_rent|"gas_top|"core_cutting|"sedal)[^}]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          const items: { label: string; value: string }[] = [];
-          const labelMap: Record<string, string> = {
-            copper_pipe_meters: "Copper Pipe", odu_stand_qty: "ODU Stand", four_core_wire_meters: "4-Core Wire",
-            three_core_wire_meters: "3-Core Wire", drain_pipe_meters: "Drain Pipe", ladder_rent: "Ladder Rent",
-            gas_top_up: "Gas Top-Up", core_cutting: "Core Cutting", sedal: "Sedal",
-          };
-          for (const [k, v] of Object.entries(parsed)) {
-            if (k === "calculated_costs" || k === "total_calculated_cost") continue;
-            const label = labelMap[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            items.push({ label, value: typeof v === "boolean" ? (v ? "Yes" : "No") : `${v}` });
-          }
-          return items.length > 0 ? items : null;
-        } catch { return null; }
-      }
-      return null;
-    })(),
-    plainNotes: (() => {
-      const raw = inst.remarks ?? "";
-      if (!raw) return "";
-      // If it's purely JSON material data, don't show as notes
-      if (raw.match(/^\s*"?Materials?:?\s*\{/i) || raw.match(/^\s*\{.*copper_pipe/i)) return "";
-      // Remove any inline JSON parts and return the readable text
-      return raw.replace(/\{[^{}]*\}/g, '').replace(/^["\s]+|["\s]+$/g, '').replace(/Materials?:?\s*/i, '').trim();
-    })(),
-    _raw: inst,
-  }));
+  const installations = (appData?.installations || []).map((inst: InstallationData) => {
+    return {
+      id: String(inst.id),
+      docketId: inst.bookingId ?? `DOC-${inst.id}`,
+      site: inst.siteName ?? "Unknown",
+      siteId: String(inst.siteId),
+      units: 1,
+      status: inst.shipmentStatus === "PENDING" ? "Pending Dispatch"
+        : inst.shipmentStatus === "IN_TRANSIT" ? "In Transit"
+        : inst.shipmentStatus === "DELIVERED" ? "Scheduled"
+        : inst.shipmentStatus === "INSTALLED" ? "Completed"
+        : inst.shipmentStatus ?? "Pending Dispatch",
+      progress: inst.shipmentStatus === "INSTALLED" ? 100
+        : inst.shipmentStatus === "DELIVERED" ? 75
+        : inst.shipmentStatus === "IN_TRANSIT" ? 40
+        : 5,
+      shipmentDate: inst.createdAt ? new Date(inst.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-",
+      eta: inst.eta ?? "-",
+      installer: "-",
+      installerContact: "-",
+      priority: "Medium",
+      notes: inst.remarks ?? "",
+      acAssetSerial: inst.acAssetSerial ?? "",
+      hasEvidence: !!(inst.serialNumberImageUrl || inst.evidenceImagesJson),
+      // Parse remarks: if it looks like JSON materials data, extract it; otherwise treat as plain text
+      materials: (() => {
+        const raw = inst.remarks ?? "";
+        // Try to detect JSON material data patterns
+        const jsonMatch = raw.match(/\{[^{}]*(?:"copper_pipe|"odu_stand|"four_core|"three_core|"drain_pipe|"ladder_rent|"gas_top|"core_cutting|"sedal)[^}]*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const items: { label: string; value: string }[] = [];
+            const labelMap: Record<string, string> = {
+              copper_pipe_meters: "Copper Pipe", odu_stand_qty: "ODU Stand", four_core_wire_meters: "4-Core Wire",
+              three_core_wire_meters: "3-Core Wire", drain_pipe_meters: "Drain Pipe", ladder_rent: "Ladder Rent",
+              gas_top_up: "Gas Top-Up", core_cutting: "Core Cutting", sedal: "Sedal",
+            };
+            for (const [k, v] of Object.entries(parsed)) {
+              if (k === "calculated_costs" || k === "total_calculated_cost") continue;
+              const label = labelMap[k] || k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              items.push({ label, value: typeof v === "boolean" ? (v ? "Yes" : "No") : `${v}` });
+            }
+            return items.length > 0 ? items : null;
+          } catch { return null; }
+        }
+        return null;
+      })(),
+      plainNotes: (() => {
+        const raw = inst.remarks ?? "";
+        if (!raw) return "";
+        // If it's purely JSON material data, don't show as notes
+        if (raw.match(/^\s*"?Materials?:?\s*\{/i) || raw.match(/^\s*\{.*copper_pipe/i)) return "";
+        // Remove any inline JSON parts and return the readable text
+        return raw.replace(/\{[^{}]*\}/g, '').replace(/^["\s]+|["\s]+$/g, '').replace(/Materials?:?\s*/i, '').trim();
+      })(),
+      _raw: inst,
+    };
+  });
 
   const filteredInstallations = installations.filter((inst) => {
     const matchesSearch =
@@ -222,65 +207,24 @@ export default function Installations() {
         </Select>
       </div>
 
-      {/* Installation Cards */}
-      <div className="space-y-4">
+      {/* Installation Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredInstallations.map((inst, index) => (
-          <Card key={inst.id} className="data-card cursor-pointer animate-slide-up" style={{ animationDelay: `${index * 50}ms` }} onClick={() => navigate(`/site/${inst.siteId}`)}>
-            <CardContent className="p-5">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-start justify-between lg:justify-start gap-4 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-foreground">{inst.docketId}</span>
-                        <span className={`text-xs font-medium ${priorityConfig[inst.priority]}`}>{inst.priority} Priority</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="w-3.5 h-3.5" />{inst.site}</div>
-                    </div>
-                    <Badge className={`${statusConfig[inst.status]?.bgColor} ${statusConfig[inst.status]?.color} border-0`}>{inst.status}</Badge>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-sm mb-1.5"><span className="text-muted-foreground">Progress</span><span className="font-medium">{inst.progress}%</span></div>
-                    <Progress value={inst.progress} className="h-2" />
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div><p className="text-muted-foreground mb-0.5">Units</p><p className="font-medium">{inst.units} ACS</p></div>
-                    <div><p className="text-muted-foreground mb-0.5">Shipped</p><p className="font-medium">{inst.shipmentDate}</p></div>
-                    <div><p className="text-muted-foreground mb-0.5">ETA</p><p className={`font-medium ${inst.status === "Delayed" ? "text-[hsl(var(--status-error))]" : ""}`}>{inst.eta}</p></div>
-                    <div><p className="text-muted-foreground mb-0.5">Asset</p><p className="font-medium font-mono text-xs" title={inst.acAssetSerial}>{inst.acAssetSerial ? (inst.acAssetSerial.length > 16 ? `${inst.acAssetSerial.slice(0, 8)}...${inst.acAssetSerial.slice(-5)}` : inst.acAssetSerial) : "-"}</p></div>
-                  </div>
-                  {/* Materials breakdown */}
-                  {inst.materials && inst.materials.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Materials Used</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {inst.materials.map((m: { label: string; value: string }, i: number) => (
-                          <Badge key={i} variant="outline" className="text-[10px] font-normal gap-1">
-                            <span className="text-muted-foreground">{m.label}:</span>
-                            <span className="font-medium">{m.value}</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {inst.plainNotes && <p className="mt-3 text-sm text-muted-foreground italic">"{inst.plainNotes}"</p>}
-                </div>
-                <div className="flex lg:flex-col gap-2 shrink-0">
-                  {inst.hasEvidence && (
-                    <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => { e.stopPropagation(); openEvidence(inst._raw); }}>
-                      <Camera className="w-4 h-4" />Evidence
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none" onClick={(e) => { e.stopPropagation(); setSelectedInst({ id: inst.id, name: inst.docketId }); setEditOpen(true); }}>
-                    <Pencil className="w-4 h-4" />Edit
-                  </Button>
-                  <Button size="sm" className="flex-1 lg:flex-none" onClick={(e) => { e.stopPropagation(); navigate(`/site/${inst.siteId}`); }}>
-                    View Site<ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div
+            key={inst.id}
+            className="animate-slide-up"
+            style={{ animationDelay: `${index * 50}ms` }}
+          >
+            <InstallationCard
+              installation={inst}
+              onViewSite={() => navigate(`/site/${inst.siteId}`)}
+              onEdit={() => {
+                setSelectedInst({ id: inst.id, name: inst.docketId });
+                setEditOpen(true);
+              }}
+              onViewEvidence={() => openEvidence(inst._raw)}
+            />
+          </div>
         ))}
       </div>
 
